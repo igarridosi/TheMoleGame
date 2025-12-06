@@ -1,0 +1,103 @@
+﻿<Window x:Class="Client.GameWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:Client"
+        mc:Ignorable="d"
+        Title="The Mole - Lobby" Height="600" Width="900"
+        WindowStartupLocation="CenterScreen"
+        Background="#1E1E1E">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="250"/>
+            <!-- Ezkerra: Jokalariak -->
+            <ColumnDefinition Width="*"/>
+            <!-- Eskuma: Chat eta Jokoa -->
+        </Grid.ColumnDefinitions>
+
+        <!-- EZKERRALDEA: JOKALARI ZERRENDA -->
+        <Border Grid.Column="0" Background="#252526" BorderBrush="#333333" BorderThickness="0,0,1,0">
+            <Grid Margin="10">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Text="JOKALARIAK" Foreground="#00ADB5" FontWeight="Bold" FontSize="16" Margin="0,0,0,10"/>
+
+                <!-- Jokalarien zerrenda -->
+                <ListBox x:Name="lstPlayers" Grid.Row="1" Background="Transparent" BorderThickness="0" Foreground="White">
+                    <!-- Hemen agertuko dira izenak dinamikoki -->
+                </ListBox>
+
+                <!-- Admin Botoiak -->
+                <StackPanel Grid.Row="2" Margin="0,10,0,0">
+                    <Button x:Name="btnStartGame" 
+                            Content="HASI PARTIDA" 
+                            Height="40" 
+                            Background="#FF5555" 
+                            Foreground="White" 
+                            FontWeight="Bold"
+                            BorderThickness="0"
+                            Visibility="Collapsed" 
+                            Click="BtnStartGame_Click"/>
+                    <!-- Visibility="Collapsed": Bakarrik Adminak ikusiko du -->
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ESKUMALDEA: CHAT ETA JOKO EREMUA -->
+        <Grid Grid.Column="1" Margin="10">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <!-- Izenburua -->
+                <RowDefinition Height="*"/>
+                <!-- Chat Historia -->
+                <RowDefinition Height="Auto"/>
+                <!-- Input -->
+            </Grid.RowDefinitions>
+
+            <StackPanel Orientation="Horizontal" Grid.Row="0" Margin="0,0,0,10">
+                <TextBlock Text="GELA NAGUSIA" Foreground="White" FontSize="20" FontWeight="Light"/>
+                <TextBlock x:Name="lblUserInfo" Text="(Erabiltzailea: ...)" Foreground="Gray" VerticalAlignment="Center" Margin="15,0,0,0"/>
+            </StackPanel>
+
+            <!-- Chat Historia -->
+            <Border Grid.Row="1" Background="#2D2D2D" CornerRadius="5" Padding="5">
+                <ScrollViewer x:Name="scrollChat">
+                    <StackPanel x:Name="pnlChatMessages">
+                        <!-- Mezuak hemen gehituko dira -->
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+
+            <!-- Input Eremua -->
+            <Grid Grid.Row="2" Margin="0,10,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="80"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBox x:Name="txtMessage" 
+                         Height="40" 
+                         Padding="5" 
+                         VerticalContentAlignment="Center"
+                         Background="#2D2D2D" 
+                         Foreground="White" 
+                         BorderBrush="#00ADB5"/>
+
+                <Button x:Name="btnSend" 
+                        Grid.Column="1" 
+                        Content="BIDALI" 
+                        Background="#00ADB5" 
+                        Foreground="White" 
+                        FontWeight="Bold"
+                        BorderThickness="0"
+                        Margin="5,0,0,0"
+                        Click="BtnSend_Click"/>
+            </Grid>
+        </Grid>
+    </Grid>
+</Window>

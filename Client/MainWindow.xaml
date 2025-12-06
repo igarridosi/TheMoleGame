@@ -1,0 +1,71 @@
+﻿<Window x:Class="Client.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:Client"
+        mc:Ignorable="d"
+        Title="The Mole - Login" Height="450" Width="400"
+        WindowStartupLocation="CenterScreen" ResizeMode="NoResize"
+        Background="#1E1E1E">
+    <Border Padding="20">
+        <StackPanel VerticalAlignment="Center">
+
+            <!-- Izenburua -->
+            <TextBlock Text="THE MOLE" 
+                       Foreground="#00ADB5" 
+                       FontSize="32" 
+                       FontWeight="Bold" 
+                       HorizontalAlignment="Center" 
+                       Margin="0,0,0,30"/>
+
+            <!-- Erabiltzailea -->
+            <TextBlock Text="Erabiltzailea" Foreground="Gray" Margin="0,0,0,5"/>
+            <TextBox x:Name="txtUsername" 
+                     Height="30" 
+                     Padding="5"
+                     Background="#2D2D2D" 
+                     Foreground="White"
+                     BorderBrush="#00ADB5"
+                     Margin="0,0,0,15"/>
+
+            <!-- Pasahitza -->
+            <TextBlock Text="Pasahitza" Foreground="Gray" Margin="0,0,0,5"/>
+            <PasswordBox x:Name="txtPassword" 
+                         Height="30" 
+                         Padding="5"
+                         Background="#2D2D2D" 
+                         Foreground="White"
+                         BorderBrush="#00ADB5"
+                         Margin="0,0,0,20"/>
+
+            <!-- Login Botoia -->
+            <Button x:Name="btnLogin" 
+                    Content="SARTU JOKORA" 
+                    Height="40" 
+                    Background="#00ADB5" 
+                    Foreground="White" 
+                    FontWeight="Bold"
+                    BorderThickness="0"
+                    Click="BtnLogin_Click"/>
+
+            <!-- Erregistratu Botoia -->
+            <Button x:Name="btnRegister" 
+                    Content="KONTUA SORTU" 
+                    Height="30" 
+                    Background="Transparent" 
+                    Foreground="#00ADB5" 
+                    BorderBrush="#00ADB5"
+                    BorderThickness="1"
+                    Margin="0,10,0,0"
+                    Click="BtnRegister_Click"/>
+
+            <!-- Egoera mezua (Erroreak erakusteko) -->
+            <TextBlock x:Name="lblStatus" 
+                       Text="" 
+                       Foreground="#FF5555" 
+                       HorizontalAlignment="Center" 
+                       Margin="10"/>
+        </StackPanel>
+    </Border>
+</Window>
