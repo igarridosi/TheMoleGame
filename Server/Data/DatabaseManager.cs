@@ -157,6 +157,26 @@ namespace Server.Data
             }
         }
 
+        public (string Category, string Word) GetRandomWord()
+        {
+            using (var connection = GetConnection())
+            {
+                connection.Open();
+                // SQL bat ausazko lerro bat lortzeko
+                string sql = "SELECT Category, WordText FROM Words ORDER BY RANDOM() LIMIT 1";
+
+                using (var cmd = new SQLiteCommand(sql, connection))
+                using (var reader = cmd.ExecuteReader())
+                {
+                    if (reader.Read())
+                    {
+                        return (reader.GetString(0), reader.GetString(1));
+                    }
+                }
+            }
+            return ("Ezezaguna", "???"); // Zerbait gaizki badoa
+        }
+
         // Metodo laguntzailea konexioa lortzeko
         public SQLiteConnection GetConnection()
         {

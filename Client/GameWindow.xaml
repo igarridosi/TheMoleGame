@@ -28,8 +28,110 @@
                 <TextBlock Text="JOKALARIAK" Foreground="#00ADB5" FontWeight="Bold" FontSize="16" Margin="0,0,0,10"/>
 
                 <!-- Jokalarien zerrenda -->
-                <ListBox x:Name="lstPlayers" Grid.Row="1" Background="Transparent" BorderThickness="0" Foreground="White">
-                    <!-- Hemen agertuko dira izenak dinamikoki -->
+                <ListBox x:Name="lstPlayers" Grid.Row="1" 
+                         Background="Transparent" 
+                         BorderThickness="0" 
+                         Foreground="White"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Border Margin="0,2,0,2" Padding="5" CornerRadius="4" Background="#333333">
+                                <Grid>
+
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <!-- Txanda -->
+                                        <ColumnDefinition Width="Auto"/>
+                                        <!-- Izena -->
+                                        <ColumnDefinition Width="*"/>
+                                        <!-- Hitza -->
+                                        <ColumnDefinition Width="Auto"/>
+                                        <!-- BOTOIA (Berria) -->
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- ... (Txanda, Izena, Hitza berdin...) -->
+
+                                    <!-- 4. BOZKATU BOTOIA -->
+                                    <Button Grid.Column="3" 
+                                            Content="BOTATU" 
+                                            Background="#FF5555" 
+                                            Foreground="White" 
+                                            FontSize="10"
+                                            Padding="5,0,5,0"
+                                            Margin="5,0,0,0"
+                                            Click="BtnVote_Click"
+                                            Tag="{Binding Username}">
+                                        <!-- Tag-ean izena gordetzen dugu -->
+                                        <Button.Style>
+                                            <Style TargetType="Button">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <!-- Defektuz ezkutuan -->
+                                                <Style.Triggers>
+                                                    <!-- IsVotingPhase = True denean bakarrik erakutsi -->
+                                                    <DataTrigger Binding="{Binding IsVotingPhase}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                    </Button>
+
+                                    <!-- 1. TXANDA ADIERAZLEA -->
+                                    <!-- IsTurn egia bada, zirkulu berde bat edo ikono bat agertuko da -->
+                                    <Ellipse Width="10" Height="10" Margin="0,0,10,0" VerticalAlignment="Center">
+                                        <Ellipse.Style>
+                                            <Style TargetType="Ellipse">
+                                                <Setter Property="Fill" Value="Transparent"/>
+                                                <!-- Defektuz gardena -->
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsTurn}" Value="True">
+                                                        <Setter Property="Fill" Value="#00ADB5"/>
+                                                        <!-- Txanda denean urdina -->
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Ellipse.Style>
+                                    </Ellipse>
+
+
+                                    <!-- 2. IZENA -->
+                                    <TextBlock Grid.Column="1" 
+                                               Text="{Binding Username}" 
+                                               FontWeight="Bold" 
+                                               FontSize="14" 
+                                               VerticalAlignment="Center">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Foreground" Value="White"/>
+                                                <Setter Property="TextDecorations" Value="None"/>
+
+                                                <Style.Triggers>
+                                                    <!-- KANPORATUA BADA: Gorria eta Marratuta -->
+                                                    <DataTrigger Binding="{Binding IsEliminated}" Value="True">
+                                                        <Setter Property="Foreground" Value="#666666"/>
+                                                        <!-- Grisa -->
+                                                        <Setter Property="TextDecorations" Value="Strikethrough"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+
+
+
+                                    <!-- 3. HITZA (Eskubialdean) -->
+                                    <TextBlock Grid.Column="2" 
+                                               Text="{Binding SubmittedWord}" 
+                                               FontStyle="Italic" 
+                                               Foreground="Yellow" 
+                                               HorizontalAlignment="Right" 
+                                               Margin="10,0,0,0"
+                                               VerticalAlignment="Center"/>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
                 </ListBox>
 
                 <!-- Admin Botoiak -->
@@ -44,7 +146,19 @@
                             Visibility="Collapsed" 
                             Click="BtnStartGame_Click"/>
                     <!-- Visibility="Collapsed": Bakarrik Adminak ikusiko du -->
+                    <!-- REMATCH Botoia -->
+                    <Button x:Name="btnRestart" 
+                            Content="PARTIDA BERRIA SORTU" 
+                            Height="40" 
+                            Background="#00ADB5" 
+                            Foreground="White" 
+                            FontWeight="Bold"
+                            BorderThickness="0"
+                            Visibility="Collapsed" 
+                            Click="BtnRestart_Click"
+                            Margin="0,5,0,0"/>
                 </StackPanel>
+                
             </Grid>
         </Border>
 
@@ -59,10 +173,26 @@
                 <!-- Input -->
             </Grid.RowDefinitions>
 
-            <StackPanel Orientation="Horizontal" Grid.Row="0" Margin="0,0,0,10">
-                <TextBlock Text="GELA NAGUSIA" Foreground="White" FontSize="20" FontWeight="Light"/>
-                <TextBlock x:Name="lblUserInfo" Text="(Erabiltzailea: ...)" Foreground="Gray" VerticalAlignment="Center" Margin="15,0,0,0"/>
-            </StackPanel>
+            <Grid Grid.Row="0" Margin="0,0,0,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <!-- Ronda Info -->
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="GELA NAGUSIA" Foreground="White" FontSize="20" FontWeight="Light"/>
+                    <TextBlock x:Name="lblUserInfo" Text="..." Foreground="Gray" VerticalAlignment="Center" Margin="15,0,0,0"/>
+                </StackPanel>
+
+                <!-- RONDA KONTAGAILUA (BERRIA) -->
+                <Border Grid.Column="1" Background="#333333" CornerRadius="5" Padding="10,5">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="RONDA: " Foreground="Gray" FontWeight="Bold"/>
+                        <TextBlock x:Name="lblRoundInfo" Text="1 / 3" Foreground="#00ADB5" FontWeight="Bold"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
 
             <!-- Chat Historia -->
             <Border Grid.Row="1" Background="#2D2D2D" CornerRadius="5" Padding="5">
