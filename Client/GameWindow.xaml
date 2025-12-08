@@ -29,16 +29,92 @@
 
                 <!-- Jokalarien zerrenda -->
                 <ListBox x:Name="lstPlayers" Grid.Row="1" 
-                         Background="Transparent" 
-                         BorderThickness="0" 
                          Foreground="White"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled">
 
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <Border Margin="0,2,0,2" Padding="5" CornerRadius="4" Background="#333333">
-                                <Grid>
+                    <!-- 1. HAU DA BERRIA: ListBox-aren beraren ESTILOA (Atzealde zuria kentzeko) -->
+                    <ListBox.Style>
+                        <Style TargetType="ListBox">
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="BorderThickness" Value="0"/>
 
+                            <!-- Plantilla berridatzi behar da Windows-ek koloreak ez aldatzeko -->
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListBox">
+                                        <Border x:Name="Bd" 
+                                                Background="{TemplateBinding Background}"
+                                                BorderThickness="{TemplateBinding BorderThickness}"
+                                                Padding="1">
+                                            <ScrollViewer Focusable="False">
+                                                <ItemsPresenter/>
+                                            </ScrollViewer>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <!-- DESGAITZEAN: Atzealdea gardena mantendu eta Opazitatea jeitsi -->
+                                            <Trigger Property="IsEnabled" Value="False">
+                                                <Setter TargetName="Bd" Property="Background" Value="Transparent"/>
+                                                <Setter Property="Opacity" Value="0.5"/>
+                                                <!-- Hemen erregulatzen da gardentasuna -->
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                        </ListBox.Style>
+
+                        <!-- 2. HAU LEHENGOA DA: Elementu bakoitzaren estiloa (Txartelak) -->
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            <Setter Property="VerticalContentAlignment" Value="Center"/>
+                            <Setter Property="Margin" Value="0,4,0,4"/>
+                            <Setter Property="Padding" Value="0"/>
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="BorderThickness" Value="0"/>
+
+                            <!-- BERRIA: Honek ilara bera ez-fokalizagarria egiten du. 
+                                 Horrela klik egitean ez da "aukeratua" geratzen, 
+                                 baina barruko botoiak funtzionatzen jarraitzen du. -->
+                            <Setter Property="Focusable" Value="False"/>
+
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListBoxItem">
+                                        <Border x:Name="bd" 
+                                                Background="#333333" 
+                                                CornerRadius="6"
+                                                Padding="8">
+                                            <ContentPresenter />
+                                        </Border>
+
+                                        <ControlTemplate.Triggers>
+                                            <!-- Sagua gainean jartzean (Hover) - Hau mantendu dezakegu efektu polita delako -->
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="bd" Property="Background" Value="#444444"/>
+                                            </Trigger>
+
+                                            <!-- KENDUTA: IsSelected Trigger-a ezabatu dugu.
+                                                 Lehen hemen zegoen borde urdina jartzen zuen kodea.
+                                                 Kenduta, klik egitean ez da ezer gertatzen. -->
+
+                                            <!-- Kanporatua (Desgaituta) -->
+                                            <Trigger Property="IsEnabled" Value="False">
+                                                <Setter TargetName="bd" Property="Background" Value="#222222"/>
+                                                <Setter Property="Opacity" Value="0.6"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+
+                    <!-- 3. Zure ItemTemplate (Datuak nola ikusi) -->
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
                                         <!-- Txanda -->
@@ -47,70 +123,31 @@
                                         <ColumnDefinition Width="*"/>
                                         <!-- Hitza -->
                                         <ColumnDefinition Width="Auto"/>
-                                        <!-- BOTOIA (Berria) -->
+                                        <!-- Botoia -->
                                     </Grid.ColumnDefinitions>
 
-                                    <!-- ... (Txanda, Izena, Hitza berdin...) -->
-
-                                    <!-- 4. BOZKATU BOTOIA -->
-                                    <Button Grid.Column="3" 
-                                            Content="BOTATU" 
-                                            Background="#FF5555" 
-                                            Foreground="White" 
-                                            FontSize="10"
-                                            Padding="5,0,5,0"
-                                            Margin="5,0,0,0"
-                                            Click="BtnVote_Click"
-                                            Tag="{Binding Username}">
-                                        <!-- Tag-ean izena gordetzen dugu -->
-                                        <Button.Style>
-                                            <Style TargetType="Button">
-                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                                <!-- Defektuz ezkutuan -->
-                                                <Style.Triggers>
-                                                    <!-- IsVotingPhase = True denean bakarrik erakutsi -->
-                                                    <DataTrigger Binding="{Binding IsVotingPhase}" Value="True">
-                                                        <Setter Property="Visibility" Value="Visible"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Button.Style>
-                                    </Button>
-
-                                    <!-- 1. TXANDA ADIERAZLEA -->
-                                    <!-- IsTurn egia bada, zirkulu berde bat edo ikono bat agertuko da -->
+                                    <!-- Txanda Zirkulua -->
                                     <Ellipse Width="10" Height="10" Margin="0,0,10,0" VerticalAlignment="Center">
                                         <Ellipse.Style>
                                             <Style TargetType="Ellipse">
                                                 <Setter Property="Fill" Value="Transparent"/>
-                                                <!-- Defektuz gardena -->
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding IsTurn}" Value="True">
                                                         <Setter Property="Fill" Value="#00ADB5"/>
-                                                        <!-- Txanda denean urdina -->
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
                                         </Ellipse.Style>
                                     </Ellipse>
 
-
-                                    <!-- 2. IZENA -->
-                                    <TextBlock Grid.Column="1" 
-                                               Text="{Binding Username}" 
-                                               FontWeight="Bold" 
-                                               FontSize="14" 
-                                               VerticalAlignment="Center">
+                                    <!-- Izena -->
+                                    <TextBlock Grid.Column="1" Text="{Binding Username}" FontWeight="Bold" FontSize="14" VerticalAlignment="Center">
                                         <TextBlock.Style>
                                             <Style TargetType="TextBlock">
                                                 <Setter Property="Foreground" Value="White"/>
-                                                <Setter Property="TextDecorations" Value="None"/>
-
                                                 <Style.Triggers>
-                                                    <!-- KANPORATUA BADA: Gorria eta Marratuta -->
                                                     <DataTrigger Binding="{Binding IsEliminated}" Value="True">
-                                                        <Setter Property="Foreground" Value="#666666"/>
-                                                        <!-- Grisa -->
+                                                        <Setter Property="Foreground" Value="#888888"/>
                                                         <Setter Property="TextDecorations" Value="Strikethrough"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
@@ -118,20 +155,32 @@
                                         </TextBlock.Style>
                                     </TextBlock>
 
+                                    <!-- Hitza -->
+                                    <TextBlock Grid.Column="2" Text="{Binding SubmittedWord}" FontStyle="Italic" Foreground="#FFD700" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="10,0,10,0"/>
 
-
-                                    <!-- 3. HITZA (Eskubialdean) -->
-                                    <TextBlock Grid.Column="2" 
-                                               Text="{Binding SubmittedWord}" 
-                                               FontStyle="Italic" 
-                                               Foreground="Yellow" 
-                                               HorizontalAlignment="Right" 
-                                               Margin="10,0,0,0"
-                                               VerticalAlignment="Center"/>
+                                    <!-- Botoia -->
+                                    <Button Grid.Column="3" Content="BOTATU" Background="#FF5555" Foreground="White" FontSize="10" Padding="8,2" Click="BtnVote_Click" Tag="{Binding Username}">
+                                        <Button.Template>
+                                            <ControlTemplate TargetType="Button">
+                                                <Border Background="{TemplateBinding Background}" CornerRadius="4" Padding="{TemplateBinding Padding}">
+                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Border>
+                                            </ControlTemplate>
+                                        </Button.Template>
+                                        <Button.Style>
+                                            <Style TargetType="Button">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsVotingPhase}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                    </Button>
                                 </Grid>
-                            </Border>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
                 </ListBox>
 
                 <!-- Admin Botoiak -->
