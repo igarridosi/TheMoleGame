@@ -182,5 +182,78 @@ namespace Server.Data
         {
             return new SQLiteConnection(ConnectionString);
         }
-    }
+
+
+        public bool AddNewWord(string category, string word)
+        {
+            try
+            {
+                // 1. Garbitu inputa (espazioak kendu)
+                string cleanWord = word.Trim();
+                string cleanCategory = category.Trim();
+
+                using (var connection = GetConnection())
+                {
+                    connection.Open();
+
+                    // 2. EGIAZTAPENA: Begiratu ea existitzen den (LOWER erabiliz)
+                    // Honek "Pizza", "pizza", "PIZZA" berdinak direla ziurtatzen du
+                    string checkSql = "SELECT COUNT(*) FROM Words WHERE LOWER(WordText) = LOWER(@w)";
+
+                    using (var cmd = new SQLiteCommand(checkSql, connection))
+                    {
+                        cmd.Parameters.AddWithValue("@w", cleanWord);
+                        long count = (long)cmd.ExecuteScalar();
+
+                        if (count > 0)
+                        {
+                            Console.WriteLine($"[DB] Hitza existitzen da: {cleanWord}");
+                            return false; // !!! EXISTITZEN DA, EZ GEHITU !!!
+                        }
+                    }
+
+                    // 3. GEHITU: Ez bada existitzen, txertatu
+                    string sql = "INSERT INTO Words (Category, WordText) VALUES (@c, @w)";
+                    using (var cmd = new SQLiteCommand(sql, connection))
+                    {
+                        cmd.Parameters.AddWithValue("@c", cleanCategory);
+                        // Gorde jatorrizko formatuan (Adib: "Pizza" letra larriarekin)
+                        cmd.Parameters.AddWithValue("@w", cleanWord);
+                        cmd.ExecuteNonQuery();
+                    }
+                    Console.WriteLine($"[DB] Hitz berria gordeta: {cleanWord}");
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[DB ERROR] Hitz berria gehitzean: {ex.Message}");
+                return false;
+            }
+        }
+
+
+        public List<string> GetCategories()
+        {
+            List<string> categories = new List<string>();
+            try
+            {
+                using (var connection = GetConnection())
+                {
+                    connection.Open();
+                    string sql = "SELECT DISTINCT Category FROM Words ORDER BY Category";
+                    using (var cmd = new SQLiteCommand(sql, connection))
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            categories.Add(reader.GetString(0));
+                        }
+                    }
+                }
+            }
+            catch { }
+            return categories;
+        }
+    } 
 }

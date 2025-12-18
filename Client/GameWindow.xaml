@@ -185,6 +185,12 @@
 
                 <!-- Admin Botoiak -->
                 <StackPanel Grid.Row="2" Margin="0,10,0,0">
+                    <Button x:Name="btnAdminWords" 
+                        Content="+ HITZA GEHITU" 
+                        Height="30" Margin="0,0,0,15"
+                        Background="#444444" Foreground="White"
+                        Visibility="Collapsed" 
+                        Click="BtnAdminWords_Click"/>
                     <Button x:Name="btnStartGame" 
                             Content="HASI PARTIDA" 
                             Height="40" 

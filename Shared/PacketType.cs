@@ -32,6 +32,11 @@ namespace Shared
         RestartGameRequest, // Admin -> Server: "Hasi berriro"
         RestartGameInvite,   // Server -> Client: "Nahi duzu jolastu?"
 
+        AddWordRequest, // Admin -> Server
+        AddWordResponse, // Server -> Client (Ondo joan den esateko)
+        GetCategoriesRequest,  // Admin -> Server: "Ze kategoria daude?"
+        GetCategoriesResponse,  // Server -> Client: ["Animaliak", "Lekuak", ...]
+
         // Txata
         ChatMessage
     }

@@ -42,7 +42,11 @@ namespace Client
             AddSystemMessage("Partida hasi arte itxaron txateatzeko...");
 
             lblUserInfo.Text = $"(Erabiltzailea: {_currentUser.Username})";
-            if (_currentUser.IsAdmin) btnStartGame.Visibility = Visibility.Visible;
+            if (_currentUser.IsAdmin)
+            {
+                btnStartGame.Visibility = Visibility.Visible;
+                btnAdminWords.Visibility = Visibility.Visible;
+            }
 
             // 2. HASI ENTZUTEN (Atzeko planoan)
             Task.Run(() => ReceiveLoop());
@@ -72,6 +76,15 @@ namespace Client
             // Konexioa galtzen bada...
             Dispatcher.Invoke(() => MessageBox.Show("Zerbitzariarekin konexioa galdu da!"));
             Dispatcher.Invoke(() => this.Close());
+        }
+
+        private async void BtnAdminWords_Click(object sender, RoutedEventArgs e)
+        {
+            // 1. Eskatu kategoriak zerbitzariari
+            var packet = new Packet { Type = PacketType.GetCategoriesRequest };
+            await _server.SendPacketAsync(packet);
+
+            // Orain itxaron "HandleServerPacket"-ek erantzuna jasotzeko
         }
 
         private void HandleServerPacket(Packet packet)
@@ -172,6 +185,38 @@ namespace Client
                 // KASU BERRIA: Gonbidapena jaso
                 case PacketType.RestartGameInvite:
                     HandleRestartInvite();
+                    break;
+
+                case PacketType.AddWordResponse:
+                    string result = packet.Message;
+
+                    if (result == "OK")
+                    {
+                        AddSystemMessage("ADMIN: Hitz berria ondo gorde da datu-basean.");
+                        // Pop-up txiki bat ere atera dezakezu
+                        MessageBox.Show("Hitza ondo gorde da!", "Arrakasta", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                    else if (result == "EXISTS")
+                    {
+                        // HONA HEMEN ZURE ARAZOA KONPONTZEN DUEN MEZUA:
+                        MessageBox.Show("ERROREA: Hitza DAGOENEKO EXISTITZEN da datu-basean.", "Errorea", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        AddSystemMessage("ADMIN ERROREA: Hitza ez da gorde, errepikatuta dagoelako.");
+                    }
+                    else
+                    {
+                        MessageBox.Show("Errore ezezagun bat gertatu da.", "Errorea", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                    break;
+
+                case PacketType.GetCategoriesResponse:
+                    var catList = PacketSerializer.DeserializeData<List<string>>(packet.Message);
+
+                    // UI Thread-ean ireki leihoa
+                    this.Dispatcher.Invoke(() =>
+                    {
+                        AdminPanelWindow adminWin = new AdminPanelWindow(_server, catList);
+                        adminWin.ShowDialog();
+                    });
                     break;
             }
         }

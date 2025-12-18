@@ -1,0 +1,58 @@
+﻿<Window x:Class="Client.AdminPanelWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:Client"
+        mc:Ignorable="d"
+        Title="Admin Panel - Hitz Berria" Height="400" Width="450"
+        WindowStartupLocation="CenterScreen" ResizeMode="NoResize"
+        Background="#1E1E1E">
+    <Border Padding="20">
+        <StackPanel>
+            <TextBlock Text="HITZ BERRIA GEHITU" 
+                       Foreground="#00ADB5" FontSize="20" FontWeight="Bold" 
+                       HorizontalAlignment="Center" Margin="0,0,0,20"/>
+
+            <!-- Kategoria -->
+            <TextBlock Text="KATEGORIA:" Foreground="Gray" FontWeight="Bold" Margin="0,0,0,5"/>
+            <ComboBox x:Name="cmbCategory" 
+                      Height="35" 
+                      Padding="10,0"
+                      FontSize="14"
+                      VerticalContentAlignment="Center"
+                      SelectionChanged="CmbCategory_SelectionChanged"
+                      Margin="0,0,0,15">
+                <!-- Code-Behindetik beteko da -->
+            </ComboBox>
+
+            <!-- KATEGORIA BERRIA (Ezkutuan hasieran) -->
+            <StackPanel x:Name="pnlNewCategory" Visibility="Collapsed" Margin="0,0,0,15">
+                <TextBlock Text="KATEGORIA BERRIAREN IZENA:" Foreground="#00ADB5" FontWeight="Bold" Margin="0,0,0,5"/>
+                <TextBox x:Name="txtNewCategory" 
+                         Height="35" 
+                         FontSize="14"
+                         Padding="5"
+                         VerticalContentAlignment="Center"
+                         Background="#2D2D2D" 
+                         Foreground="White" 
+                         BorderBrush="#00ADB5"
+                         CaretBrush="White"/>
+            </StackPanel>
+
+            <!-- Hitza -->
+            <TextBlock Text="Hitza (Adib: Lehoia)" Foreground="Gray" Margin="0,0,0,5"/>
+            <TextBox x:Name="txtWord" Height="35" Padding="5" 
+                     Background="#333333" Foreground="White" BorderBrush="#00ADB5"
+                     VerticalContentAlignment="Center" Margin="0,0,0,20"/>
+
+            <!-- Botoiak -->
+            <Button x:Name="btnAdd" Content="GEHITU DATU-BASEARA" 
+                    Height="40" Background="#00ADB5" Foreground="White" FontWeight="Bold"
+                    BorderThickness="0" Click="BtnAdd_Click"/>
+
+            <TextBlock x:Name="lblStatus" Text="" Foreground="#FF5555" 
+                       HorizontalAlignment="Center" Margin="10"/>
+        </StackPanel>
+    </Border>
+</Window>

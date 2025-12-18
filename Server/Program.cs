@@ -214,6 +214,34 @@ class Program
                         // Adminak eskatu du -> Reset eta Gonbidapena
                         ResetGame();
                         break;
+
+                    case PacketType.AddWordRequest:
+                        var wordReq = PacketSerializer.DeserializeData<NewWordRequest>(packet.Message);
+
+                        // Logika deitu
+                        bool added = _dbManager.AddNewWord(wordReq.Category, wordReq.Word);
+
+                        // Erantzuna prestatu: "OK" edo "EXISTS"
+                        Packet resp = new Packet
+                        {
+                            Type = PacketType.AddWordResponse,
+                            Message = added ? "OK" : "EXISTS"
+                        };
+                        writer.WriteLine(PacketSerializer.Serialize(resp));
+                        break;
+
+                    case PacketType.GetCategoriesRequest:
+                        // 1. Kategoriak lortu DBtik
+                        var cats = _dbManager.GetCategories();
+
+                        // 2. Bidali
+                        Packet catResp = new Packet
+                        {
+                            Type = PacketType.GetCategoriesResponse,
+                            Message = PacketSerializer.SerializeData(cats)
+                        };
+                        writer.WriteLine(PacketSerializer.Serialize(catResp));
+                        break;
                 }
             }
         }
@@ -481,7 +509,7 @@ class Program
     private static void ProcessVotingResults()
     {
         _isVotingPhase = false;
-        Console.WriteLine("[GAME] Botoen rekuentoa...");
+        Console.WriteLine("[GAME] Botoak zenbatzen...");
 
         // 1. Bilatu boto gehien dituena
         string mostVotedUser = null;
@@ -498,38 +526,26 @@ class Program
             }
             else if (entry.Value == maxVotes)
             {
-                isTie = true; // Berdinketa
+                isTie = true;
             }
         }
 
-        // 1. KASUA: BERDINKETA
-        if (isTie || maxVotes == 0)
+        // --- DEBUG EGITEKO (KONTSOLAN IKUSTEKO ZER GERTATZEN DEN) ---
+        if (_clientNames.TryGetValue(_impostorId, out string realImpostorName))
         {
-            Packet msg = new Packet
-            {
-                Type = PacketType.ChatMessage,
-                Message = "[SISTEMA] BERDINKETA! Ez da inor kanporatu. Ronda errepikatuko da."
-            };
-            BroadcastPacket(msg);
-
-            // RONDA ERREPIKATU (Zenbakia igo gabe)
-            // Hitzak garbitu eta berriro hasi
-            _gameWords.Clear();
-            _currentTurnIndex = 0;
-
-            // Txanda ordena berregin (kasu honetan bizirik daudenak)
-            _turnOrder = _clients.Keys.Where(id => !_eliminatedPlayers.Contains(id)).ToList();
-
-            BroadcastPlayerList();
-            NextTurn(); // Berriro hasi idazten
-            return; // Atera metodotik
+            Console.WriteLine($"[DEBUG] Bozkatuena: '{mostVotedUser}' | Benetako Inpostorea: '{realImpostorName}'");
         }
+        else
+        {
+            Console.WriteLine("[ERROR] Ezin da inpostorearen izena aurkitu ID-tik abiatuta!");
+        }
+        // -------------------------------------------------------------
 
         // 2. Erabakiak hartu
         if (mostVotedUser != null && !isTie)
         {
-            // 1. KANPORATUA MARKATU
-            // Izenetik ID-a bilatu behar dugu
+            // NORBAIT KANPORATU DUTE
+            // ID-a bilatu izenetik abiatuta
             int kickedId = _clientNames.FirstOrDefault(x => x.Value == mostVotedUser).Key;
             if (kickedId != 0)
             {
@@ -538,19 +554,51 @@ class Program
 
             Packet msg = new Packet { Type = PacketType.ChatMessage, Message = $"[SISTEMA] Bozketa amaitu da. {mostVotedUser} kanporatua izan da!" };
             BroadcastPacket(msg);
-        }
 
-        // 3. JOKOA JARRAITU EDO AMAITU (Rondak begiratu)
-        if (_roundCount >= _maxRounds)
-        {
-        // RONDAK BUKATU -> INPOSTOREAK IRABAZI (Ez dute harrapatu)
-        EndGame("INPOSTOREAK");
+            // --- ALDAKETA NAGUSIA HEMEN ---
+            // Izenak konparatzean, ziurtatu biak existitzen direla
+            if (!string.IsNullOrEmpty(realImpostorName) && mostVotedUser == realImpostorName)
+            {
+                // INPOSTOREA HARRAPATUA -> HERRITARREK IRABAZI
+                Console.WriteLine("[WIN] Inpostorea harrapatu dute! Herritarrek irabazi."); // Debug
+                EndGame("HERRITARREK");
+                return; // <--- GARRANTZITSUA: Atera hemendik
+            }
+            else
+            {
+                Console.WriteLine("[GAME] Kanporatua ez zen inpostorea. Jokoak jarraitzen du.");
+            }
         }
         else
         {
-            // HURRENGO RONDA
+            // BERDINKETA
+            Packet msg = new Packet
+            {
+                Type = PacketType.ChatMessage,
+                Message = "[SISTEMA] BERDINKETA! Ez da inor kanporatu. Ronda errepikatuko da."
+            };
+            BroadcastPacket(msg);
+
+            // Ronda errepikatu
+            _gameWords.Clear();
+            _currentTurnIndex = 0;
+            _turnOrder = _clients.Keys.Where(id => !_eliminatedPlayers.Contains(id)).ToList();
+            BroadcastPlayerList();
+            NextTurn();
+            return;
+        }
+
+        // 3. JOKOA JARRAITU EDO AMAITU
+        // Inpostorea ez bada harrapatu eta rondak amaitu badira -> Inpostoreak irabazi
+        if (_roundCount >= _maxRounds)
+        {
+            Console.WriteLine("[WIN] Rondak amaitu dira. Inpostoreak irabazi."); // Debug
+            EndGame("INPOSTOREAK");
+        }
+        else
+        {
             _roundCount++;
-            SendRoundUpdate(); // UI EGUNERATU ZENBAKIAREKIN
+            SendRoundUpdate();
             StartNextRound();
         }
     }
