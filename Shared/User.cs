@@ -16,5 +16,6 @@ namespace Shared
 
         // Jokoan erabiltzeko (ez da DBn gordetzen, memorian bakarrik)
         public int Score { get; set; }
+        public string Role { get; set; }
     }
 }

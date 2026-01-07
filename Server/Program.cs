@@ -34,6 +34,9 @@ class Program
     // Noren txanda da? (Username)
     private static string _currentTurnUser = "";
 
+    // Rolak
+    private static ConcurrentDictionary<int, string> _clientRoles = new ConcurrentDictionary<int, string>();
+
     static void Main(string[] args)
     {
         SQLitePCL.Batteries.Init();
@@ -126,6 +129,7 @@ class Program
 
                             // 3. PAUSOA: Orain zerrendara gehitu eta denei abisatu
                             _clientNames.TryAdd(clientId, user.Username);
+                            _clientRoles.TryAdd(clientId, user.Role);
                             BroadcastPlayerList();
                         }
                         else
@@ -199,7 +203,9 @@ class Program
 
                             // 4. KALKULU ZUZENA: Zenbat boto behar ditugu?
                             // Konektatuta daudenak KEN kanporatuta daudenak
-                            int activePlayers = _clients.Count - _eliminatedPlayers.Count;
+                            // Moderatzaileak kendu kalkulutik
+                            int totalMods = _clientRoles.Values.Count(r => r == "Moderator");
+                            int activePlayers = _clients.Count - _eliminatedPlayers.Count - totalMods;
 
                             Console.WriteLine($"[DEBUG] Botoak: {_playersVotedCount} / {activePlayers}");
 
@@ -241,6 +247,19 @@ class Program
                             Message = PacketSerializer.SerializeData(cats)
                         };
                         writer.WriteLine(PacketSerializer.Serialize(catResp));
+                        break;
+
+                    case PacketType.AdminAnnounce:
+                        // Moderatzaileak mezu bat bidali du denei
+                        string msg = packet.Message;
+                        Packet announce = new Packet { Type = PacketType.ChatMessage, Message = $"[MODERATZAILEA]: {msg.ToUpper()}" };
+                        BroadcastPacket(announce);
+                        break;
+
+                    case PacketType.AdminSkip:
+                        // Ronda behartu amaitzera
+                        Console.WriteLine("[ADMIN] Ronda saltatzen...");
+                        StartVotingPhase(); // Zuzenean bozketara
                         break;
                 }
             }
@@ -287,6 +306,12 @@ class Program
         {
             int id = entry.Key;
             string name = entry.Value;
+
+            // 1. IRAGAZKI BERRIA: Moderatzailea bada, EZ gehitu zerrendara
+            if (_clientRoles.ContainsKey(id) && _clientRoles[id] == "Moderator")
+            {
+                continue; // Saltatu hurrengora
+            }
 
             // Begiratu ea ID hori kanporatuen zerrendan dagoen
             bool isEliminated = _eliminatedPlayers.Contains(id);
@@ -359,90 +384,112 @@ class Program
 
     private static void StartGameLogic()
     {
-        // HASIERATZEAK
+        // 1. HASIERATZEAK
         _roundCount = 1;
         _isVotingPhase = false;
-        _turnOrder = _clients.Keys.ToList();
         _currentTurnIndex = 0;
         _gameWords.Clear();
         _votes.Clear();
         _eliminatedPlayers.Clear();
+        _playersWhoVoted.Clear(); // Hau ere garbitu
 
-        int playerCount = _clients.Count;
+        // 2. JOKALARIAK IRAGAZI (Moderatzaileak kendu joko-listatik)
+        // 'playingClients' dira bakarrik jolastuko dutenak (Botatu beharrekoak)
+        var playingClients = _clients.Keys.Where(id =>
+                !_clientRoles.ContainsKey(id) || _clientRoles[id] != "Moderator"
+            ).ToList();
 
-        // 1. BALIDAZIOA: Minimo 3 jokalari
-        if (playerCount < 3)
+        int activePlayerCount = playingClients.Count;
+
+        // 3. BALIDAZIOA: Minimo 3 jokalari ERREAL (Moderatzailea kontatu gabe)
+        if (activePlayerCount < 3)
         {
-            Packet err = new Packet { Type = PacketType.ChatMessage, Message = "[SISTEMA] Gutxienez 3 jokalari behar dira partida hasteko." };
+            string msg = $"[SISTEMA] Gutxienez 3 jokalari behar dira partida hasteko. (Orain daudenak: {activePlayerCount})";
+            Console.WriteLine($"[GAME ERROR] {msg}");
+
+            Packet err = new Packet { Type = PacketType.ChatMessage, Message = msg };
             BroadcastPacket(err);
+
             return;
         }
 
-        // RONDA KOPURUA KALKULATU
-        if (playerCount == 3) _maxRounds = 1;
-        else if (playerCount <= 5) _maxRounds = 2;
+        // 4. RONDA KOPURUA KALKULATU
+        if (activePlayerCount == 3) _maxRounds = 1;
+        else if (activePlayerCount <= 5) _maxRounds = 2;
         else _maxRounds = 3;
 
-        Console.WriteLine($"[GAME CONFIG] Jokalariak: {playerCount} -> Rondak: {_maxRounds}");
+        Console.WriteLine($"[GAME CONFIG] Jokalariak: {activePlayerCount} -> Rondak: {_maxRounds}");
 
-        // 2. Hitz bat aukeratu DBtik
+        // 5. Hitz bat aukeratu DBtik
         var randomWordData = _dbManager.GetRandomWord();
         Console.WriteLine($"[GAME] Hitza aukeratuta: {randomWordData.Word} ({randomWordData.Category})");
 
-        // 3. Inpostorea aukeratu (Ausazko ID bat zerrendatik)
-        var clientIds = _clients.Keys.ToList(); // ID guztien zerrenda
+        // 6. Inpostorea aukeratu (Bakarrik JOKALARIEN artean)
         Random rnd = new Random();
-        int impostorIndex = rnd.Next(clientIds.Count);
-        int impostorId = clientIds[impostorIndex];
+        int impostorIndex = rnd.Next(playingClients.Count);
+        _impostorId = playingClients[impostorIndex]; // Gorde ID globala
 
-        // Inpostore IDa gorde klase mailan
-        _impostorId = impostorId;
+        // Inpostorearen izena lortu (Moderatzaileari esateko)
+        string impostorName = _clientNames.ContainsKey(_impostorId) ? _clientNames[_impostorId] : "Ezezaguna";
+        Console.WriteLine($"[GAME] Inpostorea ID: {_impostorId} ({impostorName})");
 
-        Console.WriteLine($"[GAME] Inpostorea ID hau da: {impostorId}");
-
-        // 4. Bezero BAKOITZARI mezu pertsonalizatua bidali
-        foreach (var clientId in clientIds)
+        // 7. MEZUAK PRESTATU ETA BIDALI (Denei, Moderatzailea barne)
+        foreach (var clientId in _clients.Keys)
         {
-            bool isImpostor = (clientId == impostorId);
-            StreamWriter writer = _clients[clientId];
+            if (!_clients.TryGetValue(clientId, out StreamWriter writer)) continue;
 
-            // Datuak prestatu
-            GameInfo info = new GameInfo
-            {
-                IsImpostor = isImpostor,
-                Category = randomWordData.Category,
-                Word = isImpostor ? "???" : randomWordData.Word // Inpostoreak ez du hitza ikusten
-            };
+            GameInfo info = new GameInfo();
+            string role = _clientRoles.ContainsKey(clientId) ? _clientRoles[clientId] : "Player";
 
-            // Paketea sortu
-            Packet packet = new Packet
+            // A) MODERATZAILEA BADA -> GOD MODE (Dena daki)
+            if (role == "Moderator")
             {
-                Type = PacketType.GameInfo, // Garrantzitsua: Mota hau erabili
-                Message = PacketSerializer.SerializeData(info)
-            };
+                info.IsImpostor = false;
+                info.Category = randomWordData.Category;
+                // Sekretua erakutsi: Hitza + Nor den inpostorea
+                info.Word = $"{randomWordData.Word} || INPOSTOREA: {impostorName}";
+            }
+            // B) INPOSTOREA BADA -> Ez du hitza ikusten
+            else if (clientId == _impostorId)
+            {
+                info.IsImpostor = true;
+                info.Category = randomWordData.Category;
+                info.Word = "???";
+            }
+            // C) HERRITARRA BADA -> Hitza ikusten du
+            else
+            {
+                info.IsImpostor = false;
+                info.Category = randomWordData.Category;
+                info.Word = randomWordData.Word;
+            }
 
             // Bidali
             try
             {
+                Packet packet = new Packet
+                {
+                    Type = PacketType.GameInfo,
+                    Message = PacketSerializer.SerializeData(info)
+                };
                 writer.WriteLine(PacketSerializer.Serialize(packet));
             }
-            catch { /* Errorea kudeatu */ }
+            catch { }
         }
 
-        // 1. TXANDEN ORDENA PRESTATU
-        _turnOrder = _clients.Keys.ToList();
+        // 8. TXANDEN ORDENA (Bakarrik jokalariak)
+        _turnOrder = playingClients; // Moderatzailea ez da hemen sartzen
         _currentTurnIndex = 0;
-        _gameWords.Clear(); // Aurreko hitzak ezabatu
 
-        // UI EGUNERATU: Ronda Info bidali
+        // UI EGUNERATU
         SendRoundUpdate();
 
-        // 2. HASI LEHENENGO TXANDA
-        NextTurn();
-
-        // 5. Chat-a aktibatzeko mezua ere bidali denei (aukerakoa, edo GameInfo jasotzean aktibatu)
+        // Mezua zabaldu
         Packet startMsg = new Packet { Type = PacketType.GameStart, Message = "Partida hasi da!" };
         BroadcastPacket(startMsg);
+
+        // 9. HASI LEHENENGO TXANDA
+        NextTurn();
     }
 
     // METODO LAGUNTZAILEA
@@ -465,6 +512,8 @@ class Program
             Console.WriteLine("[GAME] Ronda amaitu da! Bozketa garaia...");
             Packet msg = new Packet { Type = PacketType.ChatMessage, Message = "[SISTEMA] Ronda amaitu da! Denek hitz egin dute." };
             BroadcastPacket(msg);
+
+            _currentTurnUser = "";
 
             StartVotingPhase();
             return;

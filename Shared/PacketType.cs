@@ -38,6 +38,11 @@ namespace Shared
         GetCategoriesResponse,  // Server -> Client: ["Animaliak", "Lekuak", ...]
 
         // Txata
-        ChatMessage
+        ChatMessage,
+
+        // Super Admin tools
+        AdminPause,
+        AdminAnnounce, // Pantaila erdian mezu handia
+        AdminSkip
     }
 }

@@ -33,22 +33,49 @@ namespace Client
             _server = server;
             _currentUser = user;
 
-            // Lotu ListBox-a gure zerrendarekin
+            // 1. Datuen lotura (Binding) zerrendarako
             lstPlayers.ItemsSource = Players;
 
-            // 1. Chat-a EZKUTATU hasieran
+            // 2. Hasierako egoera: Chat-a eta kontrolak blokeatuta
             txtMessage.IsEnabled = false;
             btnSend.IsEnabled = false;
-            AddSystemMessage("Partida hasi arte itxaron txateatzeko...");
 
+            // Mezua hasieran
+            AddSystemMessage("Lobby-ra konektatuta. Partida hasi arte itxaron...");
             lblUserInfo.Text = $"(Erabiltzailea: {_currentUser.Username})";
+
+            // --- ADMIN LOGIKA ---
             if (_currentUser.IsAdmin)
             {
                 btnStartGame.Visibility = Visibility.Visible;
-                btnAdminWords.Visibility = Visibility.Visible;
+                btnAdminWords.Visibility = Visibility.Visible; // Hitzak gehitzeko botoia
+
+                // Adminari 'Rematch' botoia ere erakutsi behar zaio partida amaitzean, 
+                // baina hasieran ezkutuan egon behar du (defektuz Collapsed dago XAML-en).
             }
 
-            // 2. HASI ENTZUTEN (Atzeko planoan)
+            // --- MODERATZAILE LOGIKA (BERRIA) ---
+            // Erabiltzailea 'moderator' bada, Panel Berezia erakutsi
+            if (_currentUser.Username.ToLower() == "moderator")
+            {
+                // Ziurtatu XAML-en 'pnlModerator' deitu diozula panelari
+                if (pnlModerator != null)
+                {
+                    pnlModerator.Visibility = Visibility.Visible;
+                }
+
+                AddSystemMessage("SISTEMA: [GOD MODE] Moderatzaile tresnak aktibatuta.");
+
+                // Aukerakoa: Moderatzaileak agian beti izan beharko luke txata irekita?
+                // Nahi baduzu, deskomentatu hurrengo lerroak:
+                // txtMessage.IsEnabled = true;
+                // btnSend.IsEnabled = true;
+
+                txtMessage.Visibility = Visibility.Collapsed;
+                btnSend.Visibility = Visibility.Collapsed;
+            }
+
+            // 3. ENTZUN (Atzeko planoan)
             Task.Run(() => ReceiveLoop());
         }
 
@@ -112,6 +139,16 @@ namespace Client
                 // Zerrenda osoa eguneratu
                 case PacketType.PlayerList:
                     var newList = PacketSerializer.DeserializeData<List<PlayerState>>(packet.Message);
+
+                    // MODERATZAILEA BANAIZ, BOTOIAK EZABATU
+                    // Zerrenda pantailaratu aurretik, 'IsVotingPhase' false jartzen dugu lokalean.
+                    if (_currentUser.Username.ToLower() == "moderator")
+                    {
+                        foreach (var p in newList)
+                        {
+                            p.IsVotingPhase = false; // Botoia ezkutatu egingo da
+                        }
+                    }
 
                     Players.Clear();
                     foreach (var p in newList)
@@ -253,34 +290,16 @@ namespace Client
         {
             if (string.IsNullOrWhiteSpace(txtMessage.Text)) return;
 
-            // Begiratu ea nire txanda den (zerrendan begiratuz)
-            bool isMyTurn = false;
-            foreach (var p in Players)
-            {
-                if (p.Username == _currentUser.Username && p.IsTurn) isMyTurn = true;
-            }
+            string fullMessage = $"{_currentUser.Username}: {txtMessage.Text}";
 
-            if (isMyTurn)
+            var packet = new Packet
             {
-                // JOKO HITZA BIDALI
-                var packet = new Packet
-                {
-                    Type = PacketType.SubmitGameWord,
-                    Message = txtMessage.Text
-                };
-                await _server.SendPacketAsync(packet);
-            }
-            else
-            {
-                // CHAT NORMALA
-                string fullMessage = $"{_currentUser.Username}: {txtMessage.Text}";
-                var packet = new Packet
-                {
-                    Type = PacketType.ChatMessage,
-                    Message = fullMessage
-                };
-                await _server.SendPacketAsync(packet);
-            }
+                Type = PacketType.ChatMessage,
+                Message = fullMessage
+            };
+
+            await _server.SendPacketAsync(packet);
+
             txtMessage.Text = "";
         }
     
@@ -427,6 +446,49 @@ namespace Client
         {
             var packet = new Packet { Type = PacketType.RestartGameRequest };
             await _server.SendPacketAsync(packet);
+        }
+
+        // --- MODERATZAILE BOTOIAK ---
+
+        private async void BtnPause_Click(object sender, RoutedEventArgs e)
+        {
+            // Pause logika (PacketType.AdminPause sortu beharko zenuke Shared-en, 
+            // baina errorerik ez emateko, mezu soil bat bidaliko dugu oraingoz)
+            MessageBox.Show("Pause funtzioa oraindik ez dago inplementatuta Server aldean, baina botoia dabil!");
+
+            // Inplementatuta badaukazu:
+            // await _server.SendPacketAsync(new Packet { Type = PacketType.AdminPause });
+        }
+
+        private async void BtnSkip_Click(object sender, RoutedEventArgs e)
+        {
+            // Ziurtatu PacketType.AdminSkip existitzen dela Shared/PacketType.cs fitxategian!
+            var packet = new Packet { Type = PacketType.AdminSkip };
+            await _server.SendPacketAsync(packet);
+            AddSystemMessage("MODERATOR: Ronda saltatzeko agindua bidali da.");
+        }
+
+        private async void BtnAnnounce_Click(object sender, RoutedEventArgs e)
+        {
+            // Input txiki bat eskatzeko (InputBox ez dago WPFn defektuz, beraz leiho bat erabili edo hardcodeatu)
+            // Sinpletasunagatik, leiho berri bat sortu beharrean, mezu finko bat bidaliko dugu probatzeko,
+            // edo InputWordWindow berrerabili dezakegu!
+
+            GenericInputWindow win = new GenericInputWindow("ANNOUNCE (MEZU OROKORRA)");
+
+            if (win.ShowDialog() == true)
+            {
+                string msg = win.ResultText;
+                if (!string.IsNullOrWhiteSpace(msg))
+                {
+                    var packet = new Packet
+                    {
+                        Type = PacketType.AdminAnnounce,
+                        Message = msg
+                    };
+                    await _server.SendPacketAsync(packet);
+                }
+            }
         }
     }
 }

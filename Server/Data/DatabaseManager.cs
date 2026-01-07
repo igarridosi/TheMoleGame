@@ -64,6 +64,25 @@ namespace Server.Data
                     // Hemen deitzen dugu SecurityHelper.HashPassword
                     string hasheatutakoPasahitza = SecurityHelper.HashPassword("admin123");
 
+                    // MODERATZAILEA SORTU
+                    // Ziurtatu lehenik ez dela existitzen
+                    string checkMod = "SELECT COUNT(*) FROM Users WHERE Username = 'moderator'";
+                    using (var cmd = new SQLiteCommand(checkMod, connection))
+                    {
+                        long count = (long)cmd.ExecuteScalar();
+                        if (count == 0)
+                        {
+                            string superPass = SecurityHelper.HashPassword("masterkey");
+                            // Role zutabea 'Moderator' da
+                            string insertSuper = $"INSERT INTO Users (Username, PasswordHash, Role) VALUES ('moderator', '{superPass}', 'Moderator')";
+                            using (var cmdInsert = new SQLiteCommand(insertSuper, connection))
+                            {
+                                cmdInsert.ExecuteNonQuery();
+                            }
+                            Console.WriteLine("[DB] Moderatzailea sortu da.");
+                        }
+                    }
+
                     // KONTUZ HEMEN: 'hasheatutakoPasahitza' aldagaia sartu behar da, EZ 'admin123'
                     string insertAdmin = $"INSERT INTO Users (Username, PasswordHash, Role) VALUES ('admin', '{hasheatutakoPasahitza}', 'Admin')";
 
@@ -82,6 +101,8 @@ namespace Server.Data
                     {
                         command.ExecuteNonQuery();
                     }
+
+                    
                 }
                 Console.WriteLine("Datu-basea ondo sortu da (Hash-arekin)!");
             }
@@ -106,12 +127,15 @@ namespace Server.Data
                     {
                         if (reader.Read())
                         {
+                            string roleFromDb = reader.GetString(2); // 'Role' zutabea
+
                             // Erabiltzailea existitzen da eta pasahitza zuzena da
                             return new User
                             {
                                 Id = reader.GetInt32(0),
                                 Username = reader.GetString(1),
-                                IsAdmin = reader.GetString(2) == "Admin"
+                                Role = roleFromDb,
+                                IsAdmin = (roleFromDb == "Admin")
                             };
                         }
                     }
