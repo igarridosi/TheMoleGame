@@ -23,6 +23,8 @@ namespace Client
 
         private ServerConnection _server;
         private User _currentUser;
+        private InputWordWindow _currentInputWindow; // Leiho irekia gordetzeko
+        private AdminUsersWindow _adminUsersWindow;
 
         public ObservableCollection<PlayerState> Players { get; set; } = new ObservableCollection<PlayerState>();
 
@@ -187,16 +189,12 @@ namespace Client
                     // UI haria erabili behar da leihoa irekitzeko
                     this.Dispatcher.Invoke(() =>
                     {
-                        InputWordWindow inputWin = new InputWordWindow();
+                        // Leiho berria sortu (Server pasatuz)
+                        _currentInputWindow = new InputWordWindow(_server);
 
-                        // ShowDialog(): Leiho honek programa blokeatzen du itxi arte (Pop-up modua)
-                        if (inputWin.ShowDialog() == true)
-                        {
-                            string word = inputWin.EnteredWord;
-
-                            // Hitza zerbitzarira bidali
-                            SendGameWord(word);
-                        }
+                        // Show() erabiltzen dugu (EZ ShowDialog). 
+                        // Honek UI eguneratzen jarraitzea ahalbidetzen du (Timerra ikusiko da!)
+                        _currentInputWindow.Show();
                     });
                     break;
 
@@ -210,7 +208,7 @@ namespace Client
                     _isGameEnded = true;
                     string winner = packet.Message;
 
-                    MessageBox.Show($"JOKOA AMAITU DA!\n\nIRABAZLEAK: {winner}", "GAME OVER", MessageBoxButton.OK, MessageBoxImage.Information);
+                    MessageBox.Show($"JOKOA AMAITU DA!\n\nIRABAZLEA: {winner}", "GAME OVER", MessageBoxButton.OK, MessageBoxImage.Information);
 
                     // Admin bada, botoia erakutsi
                     if (_currentUser.IsAdmin)
@@ -253,6 +251,47 @@ namespace Client
                     {
                         AdminPanelWindow adminWin = new AdminPanelWindow(_server, catList);
                         adminWin.ShowDialog();
+                    });
+                    break;
+
+                case PacketType.TimeUpdate:
+                    string seconds = packet.Message;
+
+                    this.Dispatcher.Invoke(() =>
+                    {
+                        // 1. Testua eguneratu (Berdin dio zenbakia edo "--" den)
+                        lblTimer.Text = seconds;
+
+                        // KONPONKETA: Denbora agortu bada eta leihoa irekita badago -> ITXI
+                        if (seconds == "0" && _currentInputWindow != null && _currentInputWindow.IsLoaded)
+                        {
+                            _currentInputWindow.Close();
+                            _currentInputWindow = null;
+                        }
+                    });
+                    break;
+
+                case PacketType.GetUserListResponse:
+                    var userList = PacketSerializer.DeserializeData<List<User>>(packet.Message);
+                    this.Dispatcher.Invoke(() =>
+                    {
+                        if (_adminUsersWindow != null && _adminUsersWindow.IsVisible)
+                        {
+                            _adminUsersWindow.UpdateList(userList);
+                        }
+                    });
+                    break;
+
+                case PacketType.GetStatsResponse:
+                    var myStats = PacketSerializer.DeserializeData<UserStats>(packet.Message);
+
+                    // UI Thread-ean ireki leihoa
+                    this.Dispatcher.Invoke(() =>
+                    {
+                        // Leiho berria sortu eta ireki
+                        // _currentUser.Username pasatzen diogu izenburuan jartzeko
+                        UserProfileWindow profileWin = new UserProfileWindow(_currentUser.Username, myStats);
+                        profileWin.ShowDialog(); // ShowDialog erabiltzen dugu gainean geratzeko (modal)
                     });
                     break;
             }
@@ -489,6 +528,36 @@ namespace Client
                     await _server.SendPacketAsync(packet);
                 }
             }
+        }
+
+        private void TxtMessage_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            // Enter sakatu bada, botoiaren klik funtzioa deitu
+            if (e.Key == System.Windows.Input.Key.Enter)
+            {
+                BtnSend_Click(sender, e);
+            }
+        }
+
+        private void BtnManageUsers_Click(object sender, RoutedEventArgs e)
+        {
+            // Leihoa irekita badago, ez ireki berriro (fokua eman)
+            if (_adminUsersWindow != null && _adminUsersWindow.IsVisible)
+            {
+                _adminUsersWindow.Focus();
+                return;
+            }
+
+            // Leiho berria sortu eta ireki
+            _adminUsersWindow = new AdminUsersWindow(_server, _currentUser.Username);
+            _adminUsersWindow.Show();
+        }
+
+        private async void BtnProfile_Click(object sender, RoutedEventArgs e)
+        {
+            // Eskatu estatistikak niretzat
+            var packet = new Packet { Type = PacketType.GetStatsRequest };
+            await _server.SendPacketAsync(packet);
         }
     }
 }

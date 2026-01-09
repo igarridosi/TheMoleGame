@@ -26,7 +26,8 @@
                  Padding="5"
                  Background="#333333" 
                  Foreground="White" 
-                 BorderBrush="Gray"/>
+                 BorderBrush="Gray"
+                 KeyDown="TxtWord_KeyDown"/>
 
         <Button x:Name="btnSend" 
                 Content="BIDALI" 

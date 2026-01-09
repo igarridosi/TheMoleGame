@@ -36,7 +36,8 @@ namespace Server.Data
                             Username TEXT UNIQUE NOT NULL,
                             PasswordHash TEXT NOT NULL,
                             Role TEXT NOT NULL,
-                            CreatedDate DATETIME DEFAULT CURRENT_TIMESTAMP
+                            CreatedDate DATETIME DEFAULT CURRENT_TIMESTAMP,
+                            IsBanned INTEGER DEFAULT 0
                         );
 
                         CREATE TABLE IF NOT EXISTS Words (
@@ -51,6 +52,17 @@ namespace Server.Data
                             GamesPlayed INTEGER DEFAULT 0,
                             Wins INTEGER DEFAULT 0,
                             ImpostorTimes INTEGER DEFAULT 0,
+                            FOREIGN KEY(UserId) REFERENCES Users(Id)
+                        );
+
+                        CREATE TABLE IF NOT EXISTS Stats (
+                            UserId INTEGER PRIMARY KEY, -- Erabiltzaile bakoitzak ilara bakarra
+                            GamesPlayed INTEGER DEFAULT 0,
+                            GamesWon INTEGER DEFAULT 0,
+                            ImpostorCount INTEGER DEFAULT 0, -- Zenbat aldiz izan den inpostore
+                            ImpostorWins INTEGER DEFAULT 0,  -- Inpostore bezala irabazi
+                            CivilianCount INTEGER DEFAULT 0, -- Zenbat aldiz herritar
+                            CivilianWins INTEGER DEFAULT 0,  -- Herritar bezala irabazi
                             FOREIGN KEY(UserId) REFERENCES Users(Id)
                         );
                     ";
@@ -117,7 +129,7 @@ namespace Server.Data
                 // Pasahitza Hash bihurtu konparatzeko
                 string passwordHash = SecurityHelper.HashPassword(password);
 
-                string sql = "SELECT Id, Username, Role FROM Users WHERE Username = @u AND PasswordHash = @p";
+                string sql = "SELECT Id, Username, Role, IsBanned FROM Users WHERE Username = @u AND PasswordHash = @p";
                 using (var command = new SQLiteCommand(sql, connection))
                 {
                     command.Parameters.AddWithValue("@u", username);
@@ -127,15 +139,24 @@ namespace Server.Data
                     {
                         if (reader.Read())
                         {
-                            string roleFromDb = reader.GetString(2); // 'Role' zutabea
+                            bool banned = reader.GetInt32(3) == 1; // 1 bada, True
+
+                            if (banned)
+                            {
+                                // Trikimailu txikia: User objektu bat itzuli baina "IsBanned" markarekin,
+                                // edo null itzuli eta logean jarri.
+                                // Hobeto: null itzuli eta Console.WriteLine egin.
+                                Console.WriteLine($"[LOGIN DENIED] {username} blokeatuta dago (BANNED).");
+                                return null;
+                            }
 
                             // Erabiltzailea existitzen da eta pasahitza zuzena da
                             return new User
                             {
                                 Id = reader.GetInt32(0),
                                 Username = reader.GetString(1),
-                                Role = roleFromDb,
-                                IsAdmin = (roleFromDb == "Admin")
+                                Role = reader.GetString(2),
+                                IsAdmin = reader.GetString(2) == "Admin"
                             };
                         }
                     }
@@ -278,6 +299,157 @@ namespace Server.Data
             }
             catch { }
             return categories;
+        }
+
+        public bool SetUserBanStatus(string username, bool isBanned)
+        {
+            try
+            {
+                using (var conn = GetConnection())
+                {
+                    conn.Open();
+                    string sql = "UPDATE Users SET IsBanned = @b WHERE Username = @u";
+                    using (var cmd = new SQLiteCommand(sql, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@b", isBanned ? 1 : 0);
+                        cmd.Parameters.AddWithValue("@u", username);
+                        int rows = cmd.ExecuteNonQuery();
+                        return rows > 0;
+                    }
+                }
+            }
+            catch { return false; }
+        }
+
+        // Erabiltzaile guztien zerrenda lortzeko (Admin Panelerako)
+        public List<User> GetAllUsers()
+        {
+            var list = new List<User>();
+            using (var conn = GetConnection())
+            {
+                conn.Open();
+                string sql = "SELECT Id, Username, Role, IsBanned FROM Users";
+                using (var cmd = new SQLiteCommand(sql, conn))
+                using (var reader = cmd.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        list.Add(new User
+                        {
+                            Id = reader.GetInt32(0),
+                            Username = reader.GetString(1),
+                            Role = reader.GetString(2),
+                            // User ereduan "IsBanned" propietatea gehitu beharko dugu Shared-en!
+                        });
+                    }
+                }
+            }
+            return list;
+        }
+
+        public void UpdateStats(int userId, bool isImpostor, bool isWinner)
+        {
+            try
+            {
+                using (var conn = GetConnection())
+                {
+                    conn.Open();
+
+                    // 1. Ziurtatu ilara existitzen dela
+                    string initSql = "INSERT OR IGNORE INTO Stats (UserId) VALUES (@u)";
+                    using (var cmd = new SQLiteCommand(initSql, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@u", userId);
+                        cmd.ExecuteNonQuery();
+                    }
+
+                    // 2. Datuak eguneratu
+                    string updateSql = "UPDATE Stats SET GamesPlayed = GamesPlayed + 1";
+
+                    if (isWinner) updateSql += ", GamesWon = GamesWon + 1";
+
+                    if (isImpostor)
+                    {
+                        updateSql += ", ImpostorCount = ImpostorCount + 1";
+                        if (isWinner) updateSql += ", ImpostorWins = ImpostorWins + 1";
+                    }
+                    else
+                    {
+                        updateSql += ", CivilianCount = CivilianCount + 1";
+                        if (isWinner) updateSql += ", CivilianWins = CivilianWins + 1";
+                    }
+
+                    updateSql += " WHERE UserId = @u";
+
+                    using (var cmd = new SQLiteCommand(updateSql, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@u", userId);
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+            }
+            catch (Exception ex) { Console.WriteLine("[DB ERROR] Stats update: " + ex.Message); }
+        }
+
+        public UserStats GetUserStats(int userId)
+        {
+            using (var conn = GetConnection())
+            {
+                conn.Open();
+                string sql = "SELECT * FROM Stats WHERE UserId = @u";
+                using (var cmd = new SQLiteCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@u", userId);
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            return new UserStats
+                            {
+                                GamesPlayed = reader.GetInt32(1),
+                                GamesWon = reader.GetInt32(2),
+                                ImpostorCount = reader.GetInt32(3),
+                                ImpostorWins = reader.GetInt32(4),
+                                CivilianCount = reader.GetInt32(5),
+                                CivilianWins = reader.GetInt32(6)
+                            };
+                        }
+                    }
+                }
+            }
+            return new UserStats(); // Hutsa itzuli ezer ez badago
+        }
+
+        // Izenetik IDa lortzeko metodoa
+        public int GetUserIdByName(string username)
+        {
+            try
+            {
+                using (var connection = GetConnection())
+                {
+                    connection.Open();
+                    string sql = "SELECT Id FROM Users WHERE Username = @u";
+
+                    using (var cmd = new SQLiteCommand(sql, connection))
+                    {
+                        cmd.Parameters.AddWithValue("@u", username);
+
+                        // ExecuteScalar-ek lehenengo zutabea itzultzen du (Id)
+                        object result = cmd.ExecuteScalar();
+
+                        if (result != null)
+                        {
+                            return Convert.ToInt32(result);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[DB ERROR] GetUserIdByName: {ex.Message}");
+            }
+
+            return 0; // Ez bada aurkitzen
         }
     } 
 }

@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Client.Net;
+using Shared;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -16,25 +18,41 @@ namespace Client
 {
     public partial class InputWordWindow : Window
     {
-        public string EnteredWord { get; private set; }
+        private ServerConnection _server;
 
-        public InputWordWindow()
+        // Constructor berria: ServerConnection jasotzen du
+        public InputWordWindow(ServerConnection server)
         {
             InitializeComponent();
-            txtWord.Focus(); // Kurtsorea zuzenean idazteko prest
+            _server = server;
+            txtWord.Focus();
         }
 
-        private void BtnSend_Click(object sender, RoutedEventArgs e)
+        private async void BtnSend_Click(object sender, RoutedEventArgs e)
         {
             if (!string.IsNullOrWhiteSpace(txtWord.Text))
             {
-                EnteredWord = txtWord.Text;
-                this.DialogResult = true; // Leihoa ondo itxi dela esateko
-                this.Close();
+                // LEIHOAK BERAK BIDALTZEN DU ORAIN
+                var packet = new Packet
+                {
+                    Type = PacketType.SubmitGameWord,
+                    Message = txtWord.Text
+                };
+                await _server.SendPacketAsync(packet);
+
+                this.Close(); // Eta ixten da
             }
             else
             {
-                MessageBox.Show("Mesedez, idatzi zerbait.");
+                MessageBox.Show("Idatzi zerbait mesedez.");
+            }
+        }
+
+        private void TxtWord_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            if (e.Key == System.Windows.Input.Key.Enter)
+            {
+                BtnSend_Click(sender, e);
             }
         }
     }

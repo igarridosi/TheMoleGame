@@ -6,6 +6,9 @@ using System.Net.Sockets;
 
 class Program
 {
+    // Sinkronizaziorako sarraila
+    private static readonly object _turnLock = new object();
+
     private static TcpListener _listener;
     private static bool _isRunning = false;
     private static DatabaseManager _dbManager;
@@ -36,6 +39,9 @@ class Program
 
     // Rolak
     private static ConcurrentDictionary<int, string> _clientRoles = new ConcurrentDictionary<int, string>();
+
+    // Timer-a kontrolatzeko (Gelditu ahal izateko)
+    private static CancellationTokenSource _timerCts;
 
     static void Main(string[] args)
     {
@@ -155,19 +161,46 @@ class Program
 
                     // Jokalariak bere hitza bidali du
                     case PacketType.SubmitGameWord:
-                        string word = packet.Message;
-                        if (_clientNames.TryGetValue(clientId, out string name))
+                        // LOCK ERABILI: Hari batek bakarrik ukitu dezala logika hau aldi berean
+                        lock (_turnLock)
                         {
-                            // Gorde hitza
-                            _gameWords.AddOrUpdate(name, word, (k, v) => word);
-                            Console.WriteLine($"[GAME] {name}-ek idatzi du: {word}");
+                            // 1. BALIDAZIOA: Begiratu ea txanda indizea ondo dagoen
+                            if (_turnOrder == null || _turnOrder.Count == 0 || _currentTurnIndex >= _turnOrder.Count)
+                            {
+                                break;
+                            }
 
-                            // Broadcast egin hitza agertzeko zerrendan
-                            BroadcastPlayerList();
+                            // 2. BALIDAZIOA: Noren txanda da?
+                            int expectedId = _turnOrder[_currentTurnIndex];
 
-                            // !!! GARRANTZITSUA: Hurrengo txanda !!!
-                            _currentTurnIndex++;
-                            NextTurn();
+                            // 3. KONPARAKETA: Bidaltzailea == Txanda daukana?
+                            if (clientId != expectedId)
+                            {
+                                Console.WriteLine($"[BLOCK] {clientId} saiatu da idazten, baina ez da bere txanda.");
+                                break; // EZ EGIN EZER, IGNORATU
+                            }
+
+                            string word = packet.Message;
+                            if (_clientNames.TryGetValue(clientId, out string name))
+                            {
+                                StopTimer();
+
+                                // 1. GORDE HITZA
+                                _gameWords.AddOrUpdate(name, word, (k, v) => word);
+                                Console.WriteLine($"[GAME] {name}-ek idatzi du: {word}");
+
+                                // --- ALDAKETA HEMEN: KENDU LERRO HAU ---
+                                // BroadcastPlayerList();  <-- EZABATU HAU!
+                                // ---------------------------------------
+
+                                // Zergatik? 
+                                // NextTurn metodoak berak deituko duelako BroadcastPlayerList
+                                // egoera berriarekin (Bozketa bada botoiekin, Txanda bada hurrengo markarekin).
+
+                                // 2. LOGIKA EXEKUTATU
+                                _currentTurnIndex++;
+                                NextTurn();
+                            }
                         }
                         break;
 
@@ -211,6 +244,8 @@ class Program
 
                             if (_playersVotedCount >= activePlayers)
                             {
+                                // DENOK BOZKATU DUGU -> TIMERRA GELDITU
+                                StopTimer();
                                 ProcessVotingResults();
                             }
                         }
@@ -260,6 +295,41 @@ class Program
                         // Ronda behartu amaitzera
                         Console.WriteLine("[ADMIN] Ronda saltatzen...");
                         StartVotingPhase(); // Zuzenean bozketara
+                        break;
+
+                    case PacketType.GetUserListRequest:
+                        var users = _dbManager.GetAllUsers();
+                        writer.WriteLine(PacketSerializer.Serialize(new Packet
+                        {
+                            Type = PacketType.GetUserListResponse,
+                            Message = PacketSerializer.SerializeData(users)
+                        }));
+                        break;
+
+                    case PacketType.BanUserRequest:
+                        // Formatua: "Username|True" edo JSON objektu bat
+                        // Sinpletasunagatik, User objektu bat bidali dezakegu
+                        var banTarget = PacketSerializer.DeserializeData<User>(packet.Message);
+
+                        _dbManager.SetUserBanStatus(banTarget.Username, banTarget.IsBanned);
+                        Console.WriteLine($"[ADMIN] {banTarget.Username} BAN egoera: {banTarget.IsBanned}");
+
+                        // Banned bada eta konektatuta badago -> KICK egin
+                        if (banTarget.IsBanned) KickPlayerByName(banTarget.Username);
+                        break;
+
+                    case PacketType.GetStatsRequest:
+                        // Nire izena lortu
+                        string myName = _clientNames[clientId];
+                        int myDbId = _dbManager.GetUserIdByName(myName);
+
+                        var stats = _dbManager.GetUserStats(myDbId);
+
+                        writer.WriteLine(PacketSerializer.Serialize(new Packet
+                        {
+                            Type = PacketType.GetStatsResponse,
+                            Message = PacketSerializer.SerializeData(stats)
+                        }));
                         break;
                 }
             }
@@ -396,7 +466,8 @@ class Program
         // 2. JOKALARIAK IRAGAZI (Moderatzaileak kendu joko-listatik)
         // 'playingClients' dira bakarrik jolastuko dutenak (Botatu beharrekoak)
         var playingClients = _clients.Keys.Where(id =>
-                !_clientRoles.ContainsKey(id) || _clientRoles[id] != "Moderator"
+                _clientNames.ContainsKey(id) &&  // <--- KONPONKETA: Logeatuta egon behar du!
+                (!_clientRoles.ContainsKey(id) || _clientRoles[id] != "Moderator")
             ).ToList();
 
         int activePlayerCount = playingClients.Count;
@@ -509,34 +580,65 @@ class Program
         // Begiratu ea jokalari guztiek hitz egin duten
         if (_currentTurnIndex >= _turnOrder.Count)
         {
-            Console.WriteLine("[GAME] Ronda amaitu da! Bozketa garaia...");
-            Packet msg = new Packet { Type = PacketType.ChatMessage, Message = "[SISTEMA] Ronda amaitu da! Denek hitz egin dute." };
-            BroadcastPacket(msg);
-
-            _currentTurnUser = "";
-
-            StartVotingPhase();
+            _currentTurnUser = ""; // Garbitu "active player"
+            StartVotingPhase();    // Joan bozketara
             return;
         }
 
-        // Nori tokatzen zaio?
+        // ORAINGO TXANDA PRESTATU
         int currentClientId = _turnOrder[_currentTurnIndex];
 
-        // Bere izena lortu (Pinturillo zerrendan marka jartzeko)
+        // UI Eguneratu (Arkatza jarri)
         if (_clientNames.TryGetValue(currentClientId, out string username))
         {
-            _currentTurnUser = username; // Hau gordetzen dugu PlayerList sortzekoan erabiltzeko
-            BroadcastPlayerList(); // Denei abisatu zerrenda eguneratzeko (arkatza mugitzeko)
+            _currentTurnUser = username;
+            BroadcastPlayerList();
         }
 
-        // Bezeroari Pop-up agertzeko agindua bidali
+        // Pop-up leihoa bidali bezeroari
         if (_clients.TryGetValue(currentClientId, out StreamWriter writer))
         {
-            Packet p = new Packet { Type = PacketType.YourTurn };
-            try { writer.WriteLine(PacketSerializer.Serialize(p)); } catch { }
+            try
+            {
+                writer.WriteLine(PacketSerializer.Serialize(new Packet { Type = PacketType.YourTurn }));
+            }
+            catch { }
         }
 
         Console.WriteLine($"[GAME] Txanda: {_currentTurnUser} (Index: {_currentTurnIndex})");
+
+        // TIMERRA HASI (20 segundu)
+        StartTimer(20, () =>
+        {
+            // Hau exekutatzen da denbora agortzen bada
+            lock (_turnLock)
+            {
+                // Segurtasuna: Ziurtatu oraindik indize bera dela
+                // (Batzuetan Timerra saltatzen da jokalariak justu idatzi duenean)
+                if (_currentTurnIndex >= _turnOrder.Count) return;
+
+                Console.WriteLine($"[TIMER] {_currentTurnUser}-k denbora agortu du.");
+
+                // --- HEMEN DAGO GAKOA ---
+                // "Hutsa" idaztea hitz normal bat bezala tratatu behar dugu.
+
+                if (_clientNames.ContainsKey(currentClientId))
+                {
+                    string name = _clientNames[currentClientId];
+                    // GORDE HITZA (Honek ziurtatzen du "idatzi" duela kontatzen duela)
+                    _gameWords.AddOrUpdate(name, "Hutsa (Time)", (k, v) => "Hutsa (Time)");
+
+                    Packet msg = new Packet { Type = PacketType.ChatMessage, Message = $"[SISTEMA] {name}-k ez du garaiz idatzi." };
+                    BroadcastPacket(msg);
+                }
+
+                // INDIZEA IGO (Hurrengora pasatzeko)
+                _currentTurnIndex++;
+
+                // DEITU NEXTTURN (Berak ikusiko du ea hurrengo jokalaria den edo bozketa den)
+                NextTurn();
+            }
+        });
     }
 
     private static void StartVotingPhase()
@@ -548,11 +650,60 @@ class Program
 
         Console.WriteLine($"[GAME] {_roundCount}. Ronda amaitu da. BOZKETA HASI DA.");
 
+        // 2. MEZUA BIDALI
         Packet msg = new Packet { Type = PacketType.ChatMessage, Message = "[SISTEMA] Ronda amaitu da! Egin klik jokalari baten gainean botatzeko." };
         BroadcastPacket(msg);
 
-        // Zerrenda eguneratu (honek Client-an BOTOIAK aktibatuko ditu IsVotingPhase=true delako)
-        BroadcastPlayerList();
+        // 3. ZERRENDA EGUNERATU (Orain _isVotingPhase = true denez, botoiak agertuko dira)
+        BroadcastPlayerList();  // <--- ETA GERO HAU!
+
+        Console.WriteLine($"[GAME] 60 segundu bozkatzeko...");
+
+        // --- TIMERRA HASI (60s) ---
+        StartTimer(60, () =>
+        {
+            Console.WriteLine("[TIMER] Bozketa denbora agortu da!");
+
+            // DENBORA AGORTU BADA:
+            // Bilatu nori falta zaion bozkatzea eta KANPORATU
+            // (Bakarrik bizirik daudenak eta bozkatu ez dutenak)
+
+            var nonVoters = _clients.Keys
+                .Where(id =>
+                    !_eliminatedPlayers.Contains(id) && // Bizirik
+                    !_playersWhoVoted.Contains(id) &&   // Ez du bozkatu
+                    (!_clientRoles.ContainsKey(id) || _clientRoles[id] != "Moderator") // Ez da mod
+                ).ToList();
+
+            if (nonVoters.Count > 0)
+            {
+                foreach (var id in nonVoters)
+                {
+                    _eliminatedPlayers.Add(id);
+                    string name = _clientNames.ContainsKey(id) ? _clientNames[id] : "Ezezaguna";
+                    Console.WriteLine($"[AFK] {name} kanporatua bozkatu ez duelako.");
+
+                    Packet msg = new Packet { Type = PacketType.ChatMessage, Message = $"[SISTEMA] {name} kanporatua izan da denboraz kanpo bozkatzeagatik." };
+                    BroadcastPacket(msg);
+                }
+            }
+
+            // Kontatu bizirik daudenak (Moderatzaileak kenduta)
+            int survivors = _clients.Keys.Count(id =>
+                !_eliminatedPlayers.Contains(id) &&
+                (!_clientRoles.ContainsKey(id) || _clientRoles[id] != "Moderator")
+            );
+
+            if (survivors < 3) // Edo < 2, baina inpostore jokoetan 3 da minimo logikoa
+            {
+                Console.WriteLine("[GAME END] Jokalari gutxiegi.");
+                EndGame("PARTIDA BERTAN BEHERA (Jokalari gutxiegi)");
+                return; // Garrantzitsua
+            }
+
+            // Emaitzak prozesatu (dauden botoekin)
+            ProcessVotingResults();
+        });
     }
 
     private static void ProcessVotingResults()
@@ -617,6 +768,20 @@ class Program
             {
                 Console.WriteLine("[GAME] Kanporatua ez zen inpostorea. Jokoak jarraitzen du.");
             }
+            // BALIDAZIO BERRIA HEMEN ERE:
+            int survivors = _clients.Keys.Count(id =>
+               !_eliminatedPlayers.Contains(id) &&
+               (!_clientRoles.ContainsKey(id) || _clientRoles[id] != "Moderator")
+            );
+
+            if (survivors < 3)
+            {
+                // Inpostoreak irabazi duela esan dezakegu, edo bertan behera utzi.
+                // Normalean: 2 geratzen badira eta inpostorea bizirik badago -> Inpostoreak irabazi du.
+                Console.WriteLine("[WIN] Inpostoreak irabazi (Jokalariak < 3)");
+                EndGame("INPOSTOREA");
+                return;
+            }
         }
         else
         {
@@ -654,7 +819,32 @@ class Program
 
     private static void EndGame(string winner)
     {
-        Packet p = new Packet { Type = PacketType.GameEnd, Message = winner };
+        bool impostorWon = (winner == "INPOSTOREAK");
+
+        foreach (var clientId in _clientNames.Keys)
+        {
+            // Moderatzaileak ez du estatistikarik
+            if (_clientRoles.ContainsKey(clientId) && _clientRoles[clientId] == "Moderator") continue;
+
+            // Erabiltzailearen IDa lortu (DBko IDa, ez Socket IDa)
+            // Oharra: Hau egiteko, hasieran 'User' objektua gorde beharko genuke map batean
+            // edo izenetik bilatu DBan.
+            // Errazena: Izenetik bilatu DB Managerraren barruan.
+
+            string username = _clientNames[clientId];
+            bool isThisUserImpostor = (_impostorId == clientId);
+            bool isThisUserWinner = (isThisUserImpostor && impostorWon) || (!isThisUserImpostor && !impostorWon);
+
+            // IDa bilatu izenarekin
+            int dbId = _dbManager.GetUserIdByName(username); // Metodo hau sortu beharko duzu DBManager-en
+
+            if (dbId > 0)
+            {
+                _dbManager.UpdateStats(dbId, isThisUserImpostor, isThisUserWinner);
+            }
+        }
+
+            Packet p = new Packet { Type = PacketType.GameEnd, Message = winner };
         BroadcastPacket(p);
 
         // Reset logika...
@@ -703,5 +893,86 @@ class Program
         // Oharra: Hemen ez dugu "StartGameLogic" zuzenean deitzen.
         // Bezeroek onartu ahala UI garbituko dute, eta gero Adminak "HASI PARTIDA" 
         // emango du berriro jendea prest dagoenean.
+    }
+
+    private static async void StartTimer(int seconds, Action onTimeout)
+    {
+        // Aurreko timerra badago, bertan behera utzi
+        if (_timerCts != null) _timerCts.Cancel();
+
+        _timerCts = new CancellationTokenSource();
+        CancellationToken token = _timerCts.Token;
+
+        try
+        {
+            for (int i = seconds; i > 0; i--)
+            {
+                // 1. Eguneratu bezeroak
+                Packet p = new Packet { Type = PacketType.TimeUpdate, Message = i.ToString() };
+                BroadcastPacket(p);
+
+                // 2. Itxaron segundu bat (tokenarekin, ezeztatu ahal izateko)
+                await Task.Delay(1000, token);
+            }
+
+            // Denbora agortu da!
+            Packet timeOutMsg = new Packet { Type = PacketType.TimeUpdate, Message = "0" };
+            BroadcastPacket(timeOutMsg);
+
+            // Exekutatu timeout logika (Hutsa jarri edo kanporatu)
+            onTimeout?.Invoke();
+        }
+        catch (TaskCanceledException)
+        {
+            // Timerra gelditu dugu (Jokalariak garaiz erantzun du). Ez egin ezer.
+        }
+    }
+
+    // Timerra gelditzeko metodo laguntzailea
+    private static void StopTimer()
+    {
+        if (_timerCts != null) _timerCts.Cancel();
+        // Garbitu UIko erlojua
+        Packet p = new Packet { Type = PacketType.TimeUpdate, Message = "--" };
+        BroadcastPacket(p);
+    }
+
+    private static void KickPlayerByName(string username)
+    {
+        // Bilatu ID-a izenaren bidez
+        // FirstOrDefault erabiltzen dugu izena existitzen ez bada errorea ez emateko
+        var entry = _clientNames.FirstOrDefault(x => x.Value == username);
+        int targetId = entry.Key;
+
+        // IDa aurkitu bada (0 ez bada) eta konexioa existitzen bada
+        if (targetId != 0 && _clients.TryGetValue(targetId, out StreamWriter writer))
+        {
+            try
+            {
+                // Abisua bidali bezeroari (adeitsua izateko)
+                Packet p = new Packet { Type = PacketType.YouAreKicked, Message = "Administratzaileak zerbitzaritik bota zaitu (Kick/Ban)." };
+                writer.WriteLine(PacketSerializer.Serialize(p));
+                writer.Flush();
+            }
+            catch { }
+
+            // Pixka bat itxaron mezua iristeko, eta gero itxi
+            // (Hau ez da guztiz beharrezkoa baina laguntzen du)
+            // Thread.Sleep(100); 
+
+            // Konexioa itxi zerbitzariaren aldetik
+            // Oharra: StreamWriter ixteak azpian dagoen Socket-a ere ixten du.
+            try { writer.Close(); } catch { }
+
+            Console.WriteLine($"[ADMIN] {username} kanporatua izan da.");
+
+            // Garbiketa (HandleClient-en finally blokeak egingo luke, baina behartu dezakegu hemen ere)
+            _clients.TryRemove(targetId, out _);
+            _clientNames.TryRemove(targetId, out _);
+            _clientRoles.TryRemove(targetId, out _);
+
+            // Zerrenda eguneratua bidali denei
+            BroadcastPlayerList();
+        }
     }
 }

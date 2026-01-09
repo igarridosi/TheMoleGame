@@ -26,6 +26,7 @@ namespace Client
         private async void BtnLogin_Click(object sender, RoutedEventArgs e)
         {
             // 1. Balidazio txikia
+            string ip = txtIp.Text;
             string user = txtUsername.Text;
             string pass = txtPassword.Password;
 
@@ -40,7 +41,7 @@ namespace Client
             lblStatus.Foreground = System.Windows.Media.Brushes.Yellow;
 
             // 2. Zerbitzariarekin konektatu
-            bool connected = await _server.ConnectAsync("127.0.0.1", 8080);
+            bool connected = await _server.ConnectAsync(ip, 8080);
 
             if (!connected)
             {
@@ -96,6 +97,7 @@ namespace Client
 
         private async void BtnRegister_Click(object sender, RoutedEventArgs e)
         {
+            string ip = txtIp.Text;
             string user = txtUsername.Text;
             string pass = txtPassword.Password;
 
@@ -113,7 +115,7 @@ namespace Client
             // 1. Konektatu (beharrezkoa bada)
             if (!_server.IsConnected)
             {
-                bool connected = await _server.ConnectAsync("127.0.0.1", 8080);
+                bool connected = await _server.ConnectAsync(ip, 8080);
                 if (!connected)
                 {
                     lblStatus.Text = "Ezin zerbitzariarekin konektatu.";
@@ -154,6 +156,14 @@ namespace Client
             // Botoiak berriro aktibatu
             btnLogin.IsEnabled = true;
             btnRegister.IsEnabled = true;
+        }
+
+        private void TxtPassword_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            if (e.Key == System.Windows.Input.Key.Enter)
+            {
+                BtnLogin_Click(sender, e);
+            }
         }
     }
 }

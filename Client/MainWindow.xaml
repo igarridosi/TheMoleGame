@@ -19,6 +19,17 @@
                        HorizontalAlignment="Center" 
                        Margin="0,0,0,30"/>
 
+            <!-- IP HELBIDEA (Berria) -->
+            <TextBlock Text="Zerbitzariaren IPa" Foreground="Gray" Margin="0,0,0,5"/>
+            <TextBox x:Name="txtIp" 
+                     Height="35" 
+                     Padding="5"
+                     Background="#2D2D2D" 
+                     Foreground="White"
+                     BorderBrush="#00ADB5"
+                     Text="127.0.0.1" 
+                     Margin="0,0,0,15"/>
+            
             <!-- Erabiltzailea -->
             <TextBlock Text="Erabiltzailea" Foreground="Gray" Margin="0,0,0,5"/>
             <TextBox x:Name="txtUsername" 
@@ -37,7 +48,8 @@
                          Background="#2D2D2D" 
                          Foreground="White"
                          BorderBrush="#00ADB5"
-                         Margin="0,0,0,20"/>
+                         Margin="0,0,0,20"
+                         KeyDown="TxtPassword_KeyDown"/>
 
             <!-- Login Botoia -->
             <Button x:Name="btnLogin" 

@@ -1,0 +1,90 @@
+﻿<Window x:Class="Client.AdminUsersWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:Client"
+        mc:Ignorable="d"
+        Title="Erabiltzaile Kudeaketa" Height="500" Width="700"
+        WindowStartupLocation="CenterScreen" Background="#1E1E1E">
+    <Window.Resources>
+        <!-- ESTILO BERRIA: Goiburuak (Headers) Ilunak -->
+        <Style TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="#333333"/>
+            <Setter Property="Foreground" Value="#00ADB5"/>
+            <!-- Turkesa -->
+            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="BorderBrush" Value="#444444"/>
+            <Setter Property="BorderThickness" Value="0,0,1,1"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="ERABILTZAILEEN KUDEAKETA" Foreground="#00ADB5" FontSize="22" FontWeight="Bold" Margin="0,0,0,20"/>
+
+        <!-- DATAGRID -->
+        <DataGrid x:Name="gridUsers" Grid.Row="1" AutoGenerateColumns="False" 
+                  Background="#252526" 
+                  RowBackground="#2D2D2D" 
+                  AlternatingRowBackground="#333333"
+                  Foreground="White" 
+                  BorderBrush="#444444" BorderThickness="1"
+                  GridLinesVisibility="Horizontal"
+                  HorizontalGridLinesBrush="#444444"
+                  HeadersVisibility="Column"
+                  CanUserAddRows="False">
+
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="50" IsReadOnly="True"/>
+                <DataGridTextColumn Header="Erabiltzailea" Binding="{Binding Username}" Width="*" IsReadOnly="True"/>
+                <DataGridTextColumn Header="Rola" Binding="{Binding Role}" Width="100" IsReadOnly="True"/>
+
+                <!-- BANNED Checkbox -->
+                <DataGridCheckBoxColumn Header="Banned" Binding="{Binding IsBanned}" Width="80" IsReadOnly="True">
+                    <!-- Checkbox estiloa zaila da aldatzen, baina gutxienez ikusiko da -->
+                </DataGridCheckBoxColumn>
+
+                <!-- AKZIO BOTOI DINAMIKOA -->
+                <DataGridTemplateColumn Header="Akzioak" Width="140">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Button Click="BtnToggleBan_Click" 
+                                    FontWeight="Bold" FontSize="11" 
+                                    Margin="5" Padding="5,2" 
+                                    Cursor="Hand" BorderThickness="0">
+                                <Button.Style>
+                                    <Style TargetType="Button">
+                                        <!-- Defektuz: UNBAN (Berdea) -->
+                                        <Setter Property="Content" Value="UNBAN (Gaitu)"/>
+                                        <Setter Property="Background" Value="#00C853"/>
+                                        <Setter Property="Foreground" Value="White"/>
+
+                                        <Style.Triggers>
+                                            <!-- IsBanned = False bada -> BAN (Gorria) -->
+                                            <DataTrigger Binding="{Binding IsBanned}" Value="False">
+                                                <Setter Property="Content" Value="BAN (Blokeatu)"/>
+                                                <Setter Property="Background" Value="#FF4444"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <!-- REFRESH BOTOIA -->
+        <Button Grid.Row="2" Content="↻ ZERRENDA FRESKATU" Click="BtnRefresh_Click" 
+                Height="40" Margin="0,15,0,0" 
+                Background="#333333" Foreground="#00ADB5" FontWeight="Bold" BorderBrush="#00ADB5"/>
+    </Grid>
+</Window>

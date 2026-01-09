@@ -31,6 +31,7 @@ namespace Shared
         RoundUpdate,
         RestartGameRequest, // Admin -> Server: "Hasi berriro"
         RestartGameInvite,   // Server -> Client: "Nahi duzu jolastu?"
+        TimeUpdate,
 
         AddWordRequest, // Admin -> Server
         AddWordResponse, // Server -> Client (Ondo joan den esateko)
@@ -43,6 +44,15 @@ namespace Shared
         // Super Admin tools
         AdminPause,
         AdminAnnounce, // Pantaila erdian mezu handia
-        AdminSkip
+        AdminSkip,
+
+        GetUserListRequest, // Admin -> Server
+        GetUserListResponse, // Server -> Admin
+        BanUserRequest,      // Admin -> Server (Ban/Unban)
+        KickUser,     // Admin -> Server (Bota hau)
+        YouAreKicked, // Server -> Client (Bota zaituzte)
+
+        GetStatsRequest, 
+        GetStatsResponse
     }
 }
