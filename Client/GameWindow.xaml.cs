@@ -307,9 +307,15 @@ namespace Client
 
             if (info.IsImpostor)
             {
-                roleMessage = "INPOSTOREA ZARA!";
+                roleMessage = $"INPOSTOREA ZARA! (Kategoria: {info.Category})";
                 color = "#FF5555"; // Gorria
-                AddSystemMessage("Saiatu besteen hitza asmatzen deskubritu gabe!");
+                AddSystemMessage($"ZU ZARA INPOSTOREA! Ez dakizu hitza, baina Kategoria '{info.Category}' da.");
+            }
+            else if (!string.IsNullOrEmpty(info.Word) && info.Word.Contains("INPOSTOREA"))
+            {
+                // Hau Moderatzailea da (God Mode)
+                roleMessage = $"GOD MODE: {info.Word}";
+                color = "#FFFF00";
             }
             else
             {
