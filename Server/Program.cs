@@ -319,17 +319,34 @@ class Program
                         break;
 
                     case PacketType.GetStatsRequest:
-                        // Nire izena lortu
-                        string myName = _clientNames[clientId];
-                        int myDbId = _dbManager.GetUserIdByName(myName);
-
-                        var stats = _dbManager.GetUserStats(myDbId);
-
-                        writer.WriteLine(PacketSerializer.Serialize(new Packet
+                        try
                         {
-                            Type = PacketType.GetStatsResponse,
-                            Message = PacketSerializer.SerializeData(stats)
-                        }));
+                            // 1. Datuak lortu
+                            string myName = _clientNames[clientId];
+                            int myDbId = _dbManager.GetUserIdByName(myName);
+                            var stats = _dbManager.GetUserStats(myDbId);
+
+                            Console.WriteLine($"[STATS] Estatistikak bidaltzen: {myName}");
+
+                            // 2. Bidali
+                            writer.WriteLine(PacketSerializer.Serialize(new Packet
+                            {
+                                Type = PacketType.GetStatsResponse,
+                                Message = PacketSerializer.SerializeData(stats)
+                            }));
+                        }
+                        catch (Exception ex)
+                        {
+                            // ERROREA GERTATZEN BADA: Ez deskonektatu bezeroa!
+                            Console.WriteLine($"[ERROR STATS] Arazoa estatistikekin: {ex.Message}");
+
+                            // Estatistika hutsak bidali jokoak jarraitu dezan
+                            writer.WriteLine(PacketSerializer.Serialize(new Packet
+                            {
+                                Type = PacketType.GetStatsResponse,
+                                Message = PacketSerializer.SerializeData(new UserStats())
+                            }));
+                        }
                         break;
                 }
             }
@@ -778,7 +795,7 @@ class Program
             {
                 // Inpostoreak irabazi duela esan dezakegu, edo bertan behera utzi.
                 // Normalean: 2 geratzen badira eta inpostorea bizirik badago -> Inpostoreak irabazi du.
-                Console.WriteLine("[WIN] Inpostoreak irabazi (Jokalariak < 3)");
+                Console.WriteLine("[WIN] Inpostorea irabazi (Jokalariak < 3)");
                 EndGame("INPOSTOREA");
                 return;
             }
@@ -819,34 +836,55 @@ class Program
 
     private static void EndGame(string winner)
     {
-        bool impostorWon = (winner == "INPOSTOREAK");
+        Packet p = new Packet { Type = PacketType.GameEnd, Message = winner };
+        BroadcastPacket(p);
+
+        // Begiratu ea mezuan "BERTAN BEHERA" edo "gutxiegi" jartzen duen.
+        // Hala bada, ez gorde ezer eta atera metodotik.
+        if (winner.Contains("BERTAN BEHERA") || winner.Contains("gutxiegi"))
+        {
+            Console.WriteLine("[STATS] Partida baliogabea (Jokalari gutxiegi). Ez da ezer gordeko.");
+
+            // Garbiketa orokorra egin hurrengo partidarako
+            _gameWords.Clear();
+            _votes.Clear();
+            _eliminatedPlayers.Clear();
+            _playersWhoVoted.Clear();
+            _roundCount = 1;
+
+            return; // <--- GARRANTZITSUA: ATERA HEMENDIK!
+        }
+
+        bool impostorWon = (winner.Contains("INPOSTOREA"));
+
+        Console.WriteLine("[STATS] Estatistikak gordetzen...");
 
         foreach (var clientId in _clientNames.Keys)
         {
+            // 1. Izenak lortu
+            string username = _clientNames[clientId];
+
             // Moderatzaileak ez du estatistikarik
             if (_clientRoles.ContainsKey(clientId) && _clientRoles[clientId] == "Moderator") continue;
 
-            // Erabiltzailearen IDa lortu (DBko IDa, ez Socket IDa)
-            // Oharra: Hau egiteko, hasieran 'User' objektua gorde beharko genuke map batean
-            // edo izenetik bilatu DBan.
-            // Errazena: Izenetik bilatu DB Managerraren barruan.
-
-            string username = _clientNames[clientId];
-            bool isThisUserImpostor = (_impostorId == clientId);
-            bool isThisUserWinner = (isThisUserImpostor && impostorWon) || (!isThisUserImpostor && !impostorWon);
-
-            // IDa bilatu izenarekin
-            int dbId = _dbManager.GetUserIdByName(username); // Metodo hau sortu beharko duzu DBManager-en
+            // 2. IDa lortu DBtik
+            int dbId = _dbManager.GetUserIdByName(username);
 
             if (dbId > 0)
             {
+                // 3. Emaitza kalkulatu
+                bool isThisUserImpostor = (clientId == _impostorId);
+                bool isThisUserWinner = (isThisUserImpostor && impostorWon) || (!isThisUserImpostor && !impostorWon);
+
+                // 4. Gorde
                 _dbManager.UpdateStats(dbId, isThisUserImpostor, isThisUserWinner);
+                Console.WriteLine($"[STATS] {username} eguneratuta. (Winner: {isThisUserWinner})");
+            }
+            else
+            {
+                Console.WriteLine($"[STATS ERROR] Ez da IDrik aurkitu {username}-rentzat.");
             }
         }
-
-            Packet p = new Packet { Type = PacketType.GameEnd, Message = winner };
-        BroadcastPacket(p);
-
         // Reset logika...
     }
 

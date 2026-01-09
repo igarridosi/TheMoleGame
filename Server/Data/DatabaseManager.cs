@@ -47,22 +47,13 @@ namespace Server.Data
                         );
 
                         CREATE TABLE IF NOT EXISTS Stats (
-                            Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            UserId INTEGER,
-                            GamesPlayed INTEGER DEFAULT 0,
-                            Wins INTEGER DEFAULT 0,
-                            ImpostorTimes INTEGER DEFAULT 0,
-                            FOREIGN KEY(UserId) REFERENCES Users(Id)
-                        );
-
-                        CREATE TABLE IF NOT EXISTS Stats (
                             UserId INTEGER PRIMARY KEY, -- Erabiltzaile bakoitzak ilara bakarra
                             GamesPlayed INTEGER DEFAULT 0,
                             GamesWon INTEGER DEFAULT 0,
-                            ImpostorCount INTEGER DEFAULT 0, -- Zenbat aldiz izan den inpostore
-                            ImpostorWins INTEGER DEFAULT 0,  -- Inpostore bezala irabazi
-                            CivilianCount INTEGER DEFAULT 0, -- Zenbat aldiz herritar
-                            CivilianWins INTEGER DEFAULT 0,  -- Herritar bezala irabazi
+                            ImpostorCount INTEGER DEFAULT 0, 
+                            ImpostorWins INTEGER DEFAULT 0,  
+                            CivilianCount INTEGER DEFAULT 0, 
+                            CivilianWins INTEGER DEFAULT 0,  
                             FOREIGN KEY(UserId) REFERENCES Users(Id)
                         );
                     ";

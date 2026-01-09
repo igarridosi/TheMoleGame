@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 
 namespace Shared
 {
+    [Serializable]
     public class UserStats
     {
         public int GamesPlayed { get; set; }
