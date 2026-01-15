@@ -15,7 +15,7 @@
         <!-- EZKERRA: PERFILA -->
         <StackPanel Grid.Column="0" VerticalAlignment="Center">
             <Border Width="100" Height="100" CornerRadius="50" Background="#333333" BorderBrush="#00ADB5" BorderThickness="2" Margin="0,0,0,15">
-                <TextBlock Text="👤" FontSize="50" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="White"/>
+                <TextBlock Text="👤" FontSize="60" HorizontalAlignment="Left" VerticalAlignment="Center" Foreground="White" Margin="9,0,0,7"/>
             </Border>
             <TextBlock x:Name="lblUsername" Text="Erabiltzailea" FontSize="20" FontWeight="Bold" Foreground="#00ADB5" HorizontalAlignment="Center"/>
             <TextBlock Text="JOKALARIA" Foreground="Gray" HorizontalAlignment="Center"/>
