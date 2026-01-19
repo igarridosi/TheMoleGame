@@ -1,0 +1,101 @@
+﻿<Window x:Class="Client.RankingWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:Client"
+        mc:Ignorable="d"
+        Title="Ranking Orokorra" Height="500" Width="600"
+        WindowStartupLocation="CenterScreen" Background="#1E1E1E">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <!-- Titulua -->
+            <RowDefinition Height="Auto"/>
+            <!-- Txartelak (Dashboard) -->
+            <RowDefinition Height="*"/>
+            <!-- Zerrenda -->
+            <RowDefinition Height="Auto"/>
+            <!-- Botoia -->
+        </Grid.RowDefinitions>
+
+        <!-- TITULUA -->
+        <TextBlock Text="ESTATISTIKA OROKORRAK" Foreground="#00ADB5" FontSize="24" FontWeight="Bold" HorizontalAlignment="Left" Margin="0,0,0,20"/>
+
+        <!-- DASHBOARD (TXARTELAK) -->
+        <Grid Grid.Row="1" Margin="0,0,0,20">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- 1. PARTIDAK -->
+            <Border Grid.Column="0" Background="#2D2D2D" CornerRadius="8" Padding="15" Margin="0,0,10,0">
+                <StackPanel>
+                    <TextBlock Text="PARTIDAK GUZTIRA" Foreground="Gray" FontSize="11" FontWeight="Bold"/>
+                    <TextBlock x:Name="txtTotalGames" Text="0" Foreground="White" FontSize="32" FontWeight="Bold" Margin="0,5,0,0"/>
+                    <TextBlock Text="Jokatuta partidak" Foreground="#555" FontSize="10"/>
+                </StackPanel>
+            </Border>
+
+            <!-- 2. INPOSTORE ONENA -->
+            <Border Grid.Column="1" Background="#2D2D2D" CornerRadius="8" Padding="15" Margin="5,0,5,0">
+                <StackPanel>
+                    <TextBlock Text="INPOSTORE ONENA" Foreground="#FF5555" FontSize="11" FontWeight="Bold"/>
+                    <TextBlock x:Name="txtTopImpostor" Text="---" Foreground="#FF5555" FontSize="24" FontWeight="Bold" Margin="0,10,0,0"/>
+                    <TextBlock x:Name="txtTopWins" Text="0 garaipen" Foreground="#885555" FontSize="12"/>
+                </StackPanel>
+            </Border>
+
+            <!-- 3. OREKA (Barra) -->
+            <Border Grid.Column="2" Background="#2D2D2D" CornerRadius="8" Padding="15" Margin="10,0,0,0">
+                <StackPanel>
+                    <TextBlock Text="JOKOAREN OREKA" Foreground="#00ADB5" FontSize="11" FontWeight="Bold"/>
+
+                    <!-- Barra Grafikoa Simulatua -->
+                    <Grid Height="20" Margin="0,15,0,5">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" x:Name="colImp"/>
+                            <ColumnDefinition Width="*" x:Name="colCiv"/>
+                        </Grid.ColumnDefinitions>
+                        <Border Grid.Column="0" Background="#FF5555" CornerRadius="4,0,0,4" ToolTip="Inpostoreak"/>
+                        <Border Grid.Column="1" Background="#00ADB5" CornerRadius="0,4,4,0" ToolTip="Herritarrak"/>
+                    </Grid>
+
+                    <DockPanel>
+                        <TextBlock Text="Inpostoreak" Foreground="#FF5555" FontSize="10"/>
+                        <TextBlock x:Name="txtBalance" Text="50% / 50%" Foreground="White" FontSize="10" HorizontalAlignment="Right"/>
+                    </DockPanel>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- ZERRENDA (DataGrid) -->
+        <DataGrid x:Name="gridRanking" Grid.Row="2" 
+                  AutoGenerateColumns="False" IsReadOnly="True"
+                  Background="#252526" RowBackground="#2D2D2D" AlternatingRowBackground="#333333" HorizontalGridLinesBrush="#444444" Foreground="#00ADB5"
+                  BorderThickness="0" HeadersVisibility="Column">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Jokalaria" Binding="{Binding Username}" Width="*"/>
+                <DataGridTextColumn Header="Partidak" Binding="{Binding GamesPlayed}" Width="80"/>
+                <DataGridTextColumn Header="Garaipenak" Binding="{Binding TotalWins}" Width="80"/>
+                <DataGridTextColumn Header="Inp. Garaipenak" Binding="{Binding ImpostorWins}" Width="100"/>
+                <DataGridTextColumn Header="Win Rate" Binding="{Binding WinRate}" Width="80"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <!-- PDF BOTOIA -->
+        <Button x:Name="btnExportPdf" Grid.Row="3" 
+                Content="📄 ESPORTATU PDF (TXOSTENA)" 
+                Height="45" Margin="0,20,0,0"
+                Background="#FF5555" Foreground="White" FontWeight="Bold"
+                Visibility="Collapsed" Click="BtnExportPdf_Click">
+            <Button.Resources>
+                <Style TargetType="Border">
+                    <Setter Property="CornerRadius" Value="5"/>
+                </Style>
+            </Button.Resources>
+        </Button>
+    </Grid>
+</Window>

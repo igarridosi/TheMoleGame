@@ -348,6 +348,27 @@ class Program
                             }));
                         }
                         break;
+
+                    case PacketType.GetRankingRequest:
+                        // Bi gauzak lortu
+                        var list = _dbManager.GetGlobalRanking();
+                        var gStats = _dbManager.GetGlobalStats();
+
+                        // Paketean sartu
+                        var payload = new RankingPayload
+                        {
+                            List = list,
+                            Stats = gStats
+                        };
+
+                        writer.WriteLine(PacketSerializer.Serialize(new Packet
+                        {
+                            Type = PacketType.GetRankingResponse,
+                            Message = PacketSerializer.SerializeData(payload)
+                        }));
+                        break;
+
+
                 }
             }
         }

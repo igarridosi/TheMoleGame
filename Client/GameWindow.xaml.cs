@@ -294,6 +294,18 @@ namespace Client
                         profileWin.ShowDialog(); // ShowDialog erabiltzen dugu gainean geratzeko (modal)
                     });
                     break;
+
+                case PacketType.GetRankingResponse:
+                    // Orain RankingPayload deserializeatzen dugu!
+                    var payload = PacketSerializer.DeserializeData<RankingPayload>(packet.Message);
+
+                    this.Dispatcher.Invoke(() =>
+                    {
+                        bool amIMod = _currentUser.Username.ToLower() == "moderator";
+                        RankingWindow rankWin = new RankingWindow(payload, amIMod);
+                        rankWin.ShowDialog();
+                    });
+                    break;
             }
         }
 
@@ -563,6 +575,13 @@ namespace Client
         {
             // Eskatu estatistikak niretzat
             var packet = new Packet { Type = PacketType.GetStatsRequest };
+            await _server.SendPacketAsync(packet);
+        }
+
+        private async void BtnRanking_Click(object sender, RoutedEventArgs e)
+        {
+            // Eskatu rankinga zerbitzariari
+            var packet = new Packet { Type = PacketType.GetRankingRequest };
             await _server.SendPacketAsync(packet);
         }
     }

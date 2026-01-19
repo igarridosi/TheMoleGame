@@ -53,6 +53,9 @@ namespace Shared
         YouAreKicked, // Server -> Client (Bota zaituzte)
 
         GetStatsRequest, 
-        GetStatsResponse
+        GetStatsResponse,
+
+        GetRankingRequest,
+        GetRankingResponse,
     }
 }
