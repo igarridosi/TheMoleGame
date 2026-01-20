@@ -539,7 +539,57 @@ namespace Server.Data
             catch { }
             return stats;
         }
+        public bool CreateUserWithRole(string username, string password, string role)
+        {
+            try
+            {
+                using (var connection = GetConnection())
+                {
+                    connection.Open();
+
+                    // Existitzen den begiratu
+                    string check = "SELECT COUNT(*) FROM Users WHERE Username = @u";
+                    using (var cmd = new SQLiteCommand(check, connection))
+                    {
+                        cmd.Parameters.AddWithValue("@u", username);
+                        if ((long)cmd.ExecuteScalar() > 0) return false;
+                    }
+
+                    // Sortu
+                    string passHash = SecurityHelper.HashPassword(password);
+                    string sql = "INSERT INTO Users (Username, PasswordHash, Role) VALUES (@u, @p, @r)";
+
+                    using (var cmd = new SQLiteCommand(sql, connection))
+                    {
+                        cmd.Parameters.AddWithValue("@u", username);
+                        cmd.Parameters.AddWithValue("@p", passHash);
+                        cmd.Parameters.AddWithValue("@r", role);
+                        cmd.ExecuteNonQuery();
+                    }
+                    return true;
+                }
+            }
+            catch { return false; }
+        }
+
+        public bool UpdateUserRole(string username, string newRole)
+        {
+            try
+            {
+                using (var conn = GetConnection())
+                {
+                    conn.Open();
+                    string sql = "UPDATE Users SET Role = @r WHERE Username = @u";
+                    using (var cmd = new SQLiteCommand(sql, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@r", newRole);
+                        cmd.Parameters.AddWithValue("@u", username);
+                        cmd.ExecuteNonQuery();
+                    }
+                    return true;
+                }
+            }
+            catch { return false; }
+        }
     }
-
-
 }

@@ -21,12 +21,19 @@ namespace Client
         private ServerConnection _server;
         private string _myUsername; // Nire izena gordetzeko
 
+        // DROPDOWN AUKERAK (XAML-tik irakurtzeko "public" eta "property" izan behar du)
+        public List<string> AvailableRoles { get; set; } = new List<string> { "Player", "Admin" };
+
         // Constructor-a eguneratu: Nire izena ere pasatu behar dugu konparatzeko
         public AdminUsersWindow(ServerConnection server, string myUsername)
         {
             InitializeComponent();
             _server = server;
             _myUsername = myUsername;
+
+            // Context-a ezarri, XAML-ak "AvailableRoles" aurkitu dezan
+            this.DataContext = this;
+
             LoadUsers();
         }
 
@@ -77,6 +84,44 @@ namespace Client
 
             string status = user.IsBanned ? "BLOKEATUA (Banned)" : "DESBLOKEATUA (Active)";
             MessageBox.Show($"Erabiltzailea eguneratuta: {user.Username}\nEgoera berria: {status}");
+        }
+
+        private void BtnCreateUser_Click(object sender, RoutedEventArgs e)
+        {
+            CreateUserWindow win = new CreateUserWindow(_server);
+            win.ShowDialog();
+
+            // Leihoa ixtean, zerrenda freskatu
+            LoadUsers();
+        }
+
+        // ROLA ALDATZEAN EXEKUTATZEN DENA
+        private async void CmbRole_DropDownClosed(object sender, System.EventArgs e)
+        {
+            var comboBox = sender as ComboBox;
+            var user = comboBox.DataContext as User;
+
+            if (user == null) return;
+
+            string newRole = comboBox.SelectedItem as string; // Hau aldatu
+
+            // Rola bera bada, ez egin ezer
+            // Oharra: 'user.Role' jada aldatu da Binding-agatik, beraz zaila da konparatzea.
+            // Baina berdin dio, zerbitzariari bidaltzen diogu eta kito.
+
+            var packet = new Packet
+            {
+                Type = PacketType.UpdateUserRoleRequest,
+                Message = PacketSerializer.SerializeData(new UpdateRoleRequest
+                {
+                    Username = user.Username,
+                    NewRole = newRole
+                })
+            };
+
+            await _server.SendPacketAsync(packet);
+
+            MessageBox.Show($"Rola eguneratua: {newRole}");
         }
 
         private void BtnRefresh_Click(object sender, RoutedEventArgs e)

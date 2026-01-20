@@ -368,7 +368,33 @@ class Program
                         }));
                         break;
 
+                    case PacketType.CreateUserRequest:
+                        var req = PacketSerializer.DeserializeData<CreateUserRequest>(packet.Message);
 
+                        // Logika deitu
+                        bool created = _dbManager.CreateUserWithRole(req.Username, req.Password, req.Role);
+
+                        // Erantzuna
+                        string mezua = created ? "OK" : "ERROR";
+                        writer.WriteLine(PacketSerializer.Serialize(new Packet
+                        {
+                            Type = PacketType.CreateUserResponse,
+                            Message = mezua
+                        }));
+                        break;
+
+                    case PacketType.UpdateUserRoleRequest:
+                        var roleReq = PacketSerializer.DeserializeData<UpdateRoleRequest>(packet.Message);
+
+                        // Segurtasuna: Moderatzailea ezin da aldatu (aukerakoa)
+                        if (roleReq.Username == "moderator") break;
+
+                        _dbManager.UpdateUserRole(roleReq.Username, roleReq.NewRole);
+                        Console.WriteLine($"[ADMIN] {roleReq.Username}-ren rola aldatuta: {roleReq.NewRole}");
+
+                        // Ez dugu erantzunik bidali behar derrigorrez, 
+                        // adminak dagoeneko ikusten duelako aldaketa pantailan.
+                        break;
                 }
             }
         }

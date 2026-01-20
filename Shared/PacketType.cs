@@ -57,5 +57,9 @@ namespace Shared
 
         GetRankingRequest,
         GetRankingResponse,
+
+        CreateUserRequest, // Moderatzailea -> Server
+        CreateUserResponse, // Server -> Moderatzailea
+        UpdateUserRoleRequest,
     }
 }

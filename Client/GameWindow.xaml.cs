@@ -306,6 +306,13 @@ namespace Client
                         rankWin.ShowDialog();
                     });
                     break;
+
+                case PacketType.CreateUserResponse:
+                    if (packet.Message == "OK")
+                        MessageBox.Show("Erabiltzailea ondo sortu da!", "Arrakasta", MessageBoxButton.OK, MessageBoxImage.Information);
+                    else
+                        MessageBox.Show("ERROREA: Erabiltzailea existitzen da edo zerbait gaizki joan da.", "Errorea", MessageBoxButton.OK, MessageBoxImage.Error);
+                    break;
             }
         }
 
