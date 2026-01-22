@@ -29,6 +29,8 @@ namespace Client
             InitializeComponent();
             _data = payload;
 
+            QuestPDF.Settings.License = LicenseType.Community;
+
             // 1. Zerrenda bete
             gridRanking.ItemsSource = _data.List;
 
