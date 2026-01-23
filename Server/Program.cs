@@ -1,4 +1,5 @@
-﻿using Server.Data;
+﻿using Server;
+using Server.Data;
 using Shared;
 using System.Collections.Concurrent;
 using System.Net;
@@ -42,6 +43,14 @@ class Program
 
     // Timer-a kontrolatzeko (Gelditu ahal izateko)
     private static CancellationTokenSource _timerCts;
+
+    // Gela guztien hiztegia (Kodea -> Gela)
+    private static ConcurrentDictionary<string, GameRoom> _activeRooms = new ConcurrentDictionary<string, GameRoom>();
+
+    // Bezero bakoitza zein gelatan dagoen
+    private static ConcurrentDictionary<int, string> _clientRoomMap = new ConcurrentDictionary<int, string>();
+
+    private static ConcurrentDictionary<int, string> _tempClientNames = new ConcurrentDictionary<int, string>();
 
     static void Main(string[] args)
     {
@@ -96,322 +105,203 @@ class Program
         StreamReader reader = new StreamReader(stream);
         StreamWriter writer = new StreamWriter(stream) { AutoFlush = true };
 
-        // Bezeroari ID bat esleitu (Hari ID-a erabiliko dugu sinpletasunagatik)
         int clientId = Thread.CurrentThread.ManagedThreadId;
-
-        // ZERRENDARA GEHITU
-        _clients.TryAdd(clientId, writer);
-        Console.WriteLine($"[SERVER] Bezeroa gehituta zerrendara. Totala: {_clients.Count}");
+        Console.WriteLine($"[SERVER] Konexio berria ID: {clientId}");
 
         try
         {
             string line;
-            // Loop honek irakurtzen jarraituko du bezeroa deskonektatu arte
             while ((line = reader.ReadLine()) != null)
             {
-                // 1. JSONa Packet bihurtu
                 Packet packet = PacketSerializer.Deserialize(line);
 
-                // 2. Zer mezu mota da?
-                switch (packet.Type)
+                // 1. ESTRATEGIA: Begiratu ea bezeroa jada GELA batean dagoen
+                if (_clientRoomMap.TryGetValue(clientId, out string roomCode))
                 {
-                    case PacketType.LoginRequest:
-                        var loginReq = PacketSerializer.DeserializeData<LoginRequest>(packet.Message);
-                        Console.WriteLine($"[LOGIN] Saiakera: {loginReq.Username}");
+                    // Gela aurkitu
+                    if (_activeRooms.TryGetValue(roomCode, out GameRoom room))
+                    {
+                        // Bideratu mezua gelara (Joko logika guztia han dago)
+                        room.HandlePacket(clientId, packet);
+                    }
+                    else
+                    {
+                        // Gela desagertu da? (Errore arraroa)
+                        _clientRoomMap.TryRemove(clientId, out _);
+                    }
+                }
+                else
+                {
+                    // 2. ESTRATEGIA: Ez dago gelan (Menuan edo Loginan dago)
+                    // Hemen kudeatzen dira: Login, Register, CreateRoom, JoinRoom, Ranking, Stats...
 
-                        User user = _dbManager.ValidateUser(loginReq.Username, loginReq.Password);
+                    switch (packet.Type)
+                    {
+                        // --- KONTUAK ---
+                        case PacketType.LoginRequest:
+                            var loginReq = PacketSerializer.DeserializeData<LoginRequest>(packet.Message);
+                            User user = _dbManager.ValidateUser(loginReq.Username, loginReq.Password);
 
-                        Packet responsePacket = new Packet();
-
-                        if (user != null)
-                        {
-                            // 1. PAUSOA: Login Response prestatu
-                            responsePacket.Type = PacketType.LoginResponse;
-                            responsePacket.Message = PacketSerializer.SerializeData(user);
-
-                            // 2. PAUSOA: ERANTZUNA BIDALI (Hau da garrantzitsuena, lehenik egin behar da)
-                            writer.WriteLine(PacketSerializer.Serialize(responsePacket));
-                            Console.WriteLine($"[LOGIN] ONARTUA: {user.Username}");
-
-                            // 3. PAUSOA: Orain zerrendara gehitu eta denei abisatu
-                            _clientNames.TryAdd(clientId, user.Username);
-                            _clientRoles.TryAdd(clientId, user.Role);
-                            BroadcastPlayerList();
-                        }
-                        else
-                        {
-                            // Login okerra
-                            responsePacket.Type = PacketType.LoginResponse;
-                            responsePacket.Message = null;
-                            writer.WriteLine(PacketSerializer.Serialize(responsePacket));
-                            Console.WriteLine($"[LOGIN] UKATUA: {loginReq.Username}");
-                        }
-                        break;
-
-                    case PacketType.ChatMessage:
-                        // Norbaitek hitz egiten duenean, DENEI bidali
-                        Console.WriteLine($"[CHAT] Mezu berria zabaltzen...");
-                        BroadcastPacket(packet);
-                        break;
-
-                    case PacketType.GameStart:
-                        Console.WriteLine($"[GAME] Partida hasten...");
-                        StartGameLogic(); // Metodo berria deitu
-                        break;
-
-                    // Jokalariak bere hitza bidali du
-                    case PacketType.SubmitGameWord:
-                        // LOCK ERABILI: Hari batek bakarrik ukitu dezala logika hau aldi berean
-                        lock (_turnLock)
-                        {
-                            // 1. BALIDAZIOA: Begiratu ea txanda indizea ondo dagoen
-                            if (_turnOrder == null || _turnOrder.Count == 0 || _currentTurnIndex >= _turnOrder.Count)
+                            if (user != null)
                             {
-                                break;
+                                // Gorde izena aldi baterako (Gela sortu/sartu arte)
+                                _tempClientNames.TryAdd(clientId, user.Username);
+
+                                writer.WriteLine(PacketSerializer.Serialize(new Packet
+                                {
+                                    Type = PacketType.LoginResponse,
+                                    Message = PacketSerializer.SerializeData(user)
+                                }));
+                                Console.WriteLine($"[LOGIN] Onartua: {user.Username}");
                             }
-
-                            // 2. BALIDAZIOA: Noren txanda da?
-                            int expectedId = _turnOrder[_currentTurnIndex];
-
-                            // 3. KONPARAKETA: Bidaltzailea == Txanda daukana?
-                            if (clientId != expectedId)
+                            else
                             {
-                                Console.WriteLine($"[BLOCK] {clientId} saiatu da idazten, baina ez da bere txanda.");
-                                break; // EZ EGIN EZER, IGNORATU
+                                writer.WriteLine(PacketSerializer.Serialize(new Packet { Type = PacketType.LoginResponse, Message = null }));
                             }
-
-                            string word = packet.Message;
-                            if (_clientNames.TryGetValue(clientId, out string name))
-                            {
-                                StopTimer();
-
-                                // 1. GORDE HITZA
-                                _gameWords.AddOrUpdate(name, word, (k, v) => word);
-                                Console.WriteLine($"[GAME] {name}-ek idatzi du: {word}");
-
-                                // --- ALDAKETA HEMEN: KENDU LERRO HAU ---
-                                // BroadcastPlayerList();  <-- EZABATU HAU!
-                                // ---------------------------------------
-
-                                // Zergatik? 
-                                // NextTurn metodoak berak deituko duelako BroadcastPlayerList
-                                // egoera berriarekin (Bozketa bada botoiekin, Txanda bada hurrengo markarekin).
-
-                                // 2. LOGIKA EXEKUTATU
-                                _currentTurnIndex++;
-                                NextTurn();
-                            }
-                        }
-                        break;
-
-                    case PacketType.RegisterRequest:
-                        HandleRegister(packet.Message, writer);
-                        break;
-
-                    case PacketType.Vote:
-                        // 1. SEGURTASUNA: Kanporatua bada, ez utzi
-                        if (_eliminatedPlayers.Contains(clientId))
-                        {
                             break;
-                        }
-                        // 2. SEGURTASUNA: Jada bozkatu badu, ez utzi
-                        if (_playersWhoVoted.Contains(clientId))
-                        {
-                            Console.WriteLine($"[VOTE BLOCKED] Boto errepikatua: {_clientNames[clientId]}");
-                            break;
-                        }
 
-                        // 3. BOTOA GEHITU
-                        string votedName = packet.Message;
-                        if (_isVotingPhase)
-                        {
-                            // Markatu jokalari honek bozkatu duela
-                            _playersWhoVoted.Add(clientId);
-
-                            _votes.AddOrUpdate(votedName, 1, (key, count) => count + 1);
-                            _playersVotedCount++; // Kontagailua igo
-
-                            string voterName = _clientNames[clientId];
-                            Console.WriteLine($"[VOTE] {voterName} -> {votedName} (Totala: {_playersVotedCount})");
-
-                            // 4. KALKULU ZUZENA: Zenbat boto behar ditugu?
-                            // Konektatuta daudenak KEN kanporatuta daudenak
-                            // Moderatzaileak kendu kalkulutik
-                            int totalMods = _clientRoles.Values.Count(r => r == "Moderator");
-                            int activePlayers = _clients.Count - _eliminatedPlayers.Count - totalMods;
-
-                            Console.WriteLine($"[DEBUG] Botoak: {_playersVotedCount} / {activePlayers}");
-
-                            if (_playersVotedCount >= activePlayers)
-                            {
-                                // DENOK BOZKATU DUGU -> TIMERRA GELDITU
-                                StopTimer();
-                                ProcessVotingResults();
-                            }
-                        }
-                        break;
-
-                    case PacketType.RestartGameRequest:
-                        // Adminak eskatu du -> Reset eta Gonbidapena
-                        ResetGame();
-                        break;
-
-                    case PacketType.AddWordRequest:
-                        var wordReq = PacketSerializer.DeserializeData<NewWordRequest>(packet.Message);
-
-                        // Logika deitu
-                        bool added = _dbManager.AddNewWord(wordReq.Category, wordReq.Word);
-
-                        // Erantzuna prestatu: "OK" edo "EXISTS"
-                        Packet resp = new Packet
-                        {
-                            Type = PacketType.AddWordResponse,
-                            Message = added ? "OK" : "EXISTS"
-                        };
-                        writer.WriteLine(PacketSerializer.Serialize(resp));
-                        break;
-
-                    case PacketType.GetCategoriesRequest:
-                        // 1. Kategoriak lortu DBtik
-                        var cats = _dbManager.GetCategories();
-
-                        // 2. Bidali
-                        Packet catResp = new Packet
-                        {
-                            Type = PacketType.GetCategoriesResponse,
-                            Message = PacketSerializer.SerializeData(cats)
-                        };
-                        writer.WriteLine(PacketSerializer.Serialize(catResp));
-                        break;
-
-                    case PacketType.AdminAnnounce:
-                        // Moderatzaileak mezu bat bidali du denei
-                        string msg = packet.Message;
-                        Packet announce = new Packet { Type = PacketType.ChatMessage, Message = $"[MODERATZAILEA]: {msg.ToUpper()}" };
-                        BroadcastPacket(announce);
-                        break;
-
-                    case PacketType.AdminSkip:
-                        // Ronda behartu amaitzera
-                        Console.WriteLine("[ADMIN] Ronda saltatzen...");
-                        StartVotingPhase(); // Zuzenean bozketara
-                        break;
-
-                    case PacketType.GetUserListRequest:
-                        var users = _dbManager.GetAllUsers();
-                        writer.WriteLine(PacketSerializer.Serialize(new Packet
-                        {
-                            Type = PacketType.GetUserListResponse,
-                            Message = PacketSerializer.SerializeData(users)
-                        }));
-                        break;
-
-                    case PacketType.BanUserRequest:
-                        // Formatua: "Username|True" edo JSON objektu bat
-                        // Sinpletasunagatik, User objektu bat bidali dezakegu
-                        var banTarget = PacketSerializer.DeserializeData<User>(packet.Message);
-
-                        _dbManager.SetUserBanStatus(banTarget.Username, banTarget.IsBanned);
-                        Console.WriteLine($"[ADMIN] {banTarget.Username} BAN egoera: {banTarget.IsBanned}");
-
-                        // Banned bada eta konektatuta badago -> KICK egin
-                        if (banTarget.IsBanned) KickPlayerByName(banTarget.Username);
-                        break;
-
-                    case PacketType.GetStatsRequest:
-                        try
-                        {
-                            // 1. Datuak lortu
-                            string myName = _clientNames[clientId];
-                            int myDbId = _dbManager.GetUserIdByName(myName);
-                            var stats = _dbManager.GetUserStats(myDbId);
-
-                            Console.WriteLine($"[STATS] Estatistikak bidaltzen: {myName}");
-
-                            // 2. Bidali
+                        case PacketType.RegisterRequest:
+                            var regReq = PacketSerializer.DeserializeData<RegisterRequest>(packet.Message);
+                            // Hemen defektuz 'Player' jartzen dugu
+                            bool regOk = _dbManager.CreateUserWithRole(regReq.Username, regReq.Password, "Player");
                             writer.WriteLine(PacketSerializer.Serialize(new Packet
                             {
-                                Type = PacketType.GetStatsResponse,
-                                Message = PacketSerializer.SerializeData(stats)
+                                Type = PacketType.RegisterResponse,
+                                Message = regOk ? "OK" : "ERROR"
                             }));
-                        }
-                        catch (Exception ex)
-                        {
-                            // ERROREA GERTATZEN BADA: Ez deskonektatu bezeroa!
-                            Console.WriteLine($"[ERROR STATS] Arazoa estatistikekin: {ex.Message}");
+                            break;
 
-                            // Estatistika hutsak bidali jokoak jarraitu dezan
+                        // --- GELA KUDEAKETA ---
+                        case PacketType.CreateRoomRequest:
+                            string newCode = GenerateRoomCode();
+                            string hostName = _tempClientNames.ContainsKey(clientId) ? _tempClientNames[clientId] : "Host";
+
+                            // Sortu gela berria
+                            GameRoom newRoom = new GameRoom(newCode, clientId, writer, hostName);
+
+                            _activeRooms.TryAdd(newCode, newRoom);
+                            _clientRoomMap.TryAdd(clientId, newCode); // Lotu bezeroa gelarekin
+
+                            Console.WriteLine($"[ROOM] Gela sortu da: {newCode} (Host: {hostName})");
+
                             writer.WriteLine(PacketSerializer.Serialize(new Packet
                             {
-                                Type = PacketType.GetStatsResponse,
-                                Message = PacketSerializer.SerializeData(new UserStats())
+                                Type = PacketType.CreateRoomResponse,
+                                Message = newCode
                             }));
-                        }
-                        break;
+                            break;
 
-                    case PacketType.GetRankingRequest:
-                        // Bi gauzak lortu
-                        var list = _dbManager.GetGlobalRanking();
-                        var gStats = _dbManager.GetGlobalStats();
+                        case PacketType.JoinRoomRequest:
+                            string codeToJoin = packet.Message.ToUpper();
+                            // Izen hau lortzea oso garrantzitsua da!
+                            string joinerName = _tempClientNames.ContainsKey(clientId) ? _tempClientNames[clientId] : "Player";
 
-                        // Paketean sartu
-                        var payload = new RankingPayload
-                        {
-                            List = list,
-                            Stats = gStats
-                        };
+                            if (_activeRooms.TryGetValue(codeToJoin, out GameRoom roomToJoin))
+                            {
+                                roomToJoin.AddPlayer(clientId, writer, joinerName);
+                                _clientRoomMap.TryAdd(clientId, codeToJoin);
 
-                        writer.WriteLine(PacketSerializer.Serialize(new Packet
-                        {
-                            Type = PacketType.GetRankingResponse,
-                            Message = PacketSerializer.SerializeData(payload)
-                        }));
-                        break;
+                                // GARRANTZITSUA: Erantzuna bidali
+                                writer.WriteLine(PacketSerializer.Serialize(new Packet
+                                {
+                                    Type = PacketType.JoinRoomResponse,
+                                    Message = "OK"
+                                }));
+                            }
+                            else
+                            {
+                                // Gela ez da existitzen
+                                writer.WriteLine(PacketSerializer.Serialize(new Packet
+                                {
+                                    Type = PacketType.JoinRoomResponse,
+                                    Message = "Ez da gela aurkitu"
+                                }));
+                            }
+                            break;
 
-                    case PacketType.CreateUserRequest:
-                        var req = PacketSerializer.DeserializeData<CreateUserRequest>(packet.Message);
+                        // --- DATU GLOBALAK (Ranking, Stats, Admin Users) ---
+                        // Hauek ez dute gela behar, DBtik irakurtzen dira zuzenean
 
-                        // Logika deitu
-                        bool created = _dbManager.CreateUserWithRole(req.Username, req.Password, req.Role);
+                        case PacketType.GetRankingRequest:
+                            var ranking = _dbManager.GetGlobalRanking();
+                            var gStats = _dbManager.GetGlobalStats();
+                            writer.WriteLine(PacketSerializer.Serialize(new Packet
+                            {
+                                Type = PacketType.GetRankingResponse,
+                                Message = PacketSerializer.SerializeData(new RankingPayload { List = ranking, Stats = gStats })
+                            }));
+                            break;
 
-                        // Erantzuna
-                        string mezua = created ? "OK" : "ERROR";
-                        writer.WriteLine(PacketSerializer.Serialize(new Packet
-                        {
-                            Type = PacketType.CreateUserResponse,
-                            Message = mezua
-                        }));
-                        break;
+                        case PacketType.GetStatsRequest:
+                            try
+                            {
+                                string myName = _tempClientNames.ContainsKey(clientId) ? _tempClientNames[clientId] : "";
+                                int myDbId = _dbManager.GetUserIdByName(myName);
+                                var stats = _dbManager.GetUserStats(myDbId);
+                                writer.WriteLine(PacketSerializer.Serialize(new Packet { Type = PacketType.GetStatsResponse, Message = PacketSerializer.SerializeData(stats) }));
+                            }
+                            catch { }
+                            break;
 
-                    case PacketType.UpdateUserRoleRequest:
-                        var roleReq = PacketSerializer.DeserializeData<UpdateRoleRequest>(packet.Message);
+                        case PacketType.GetUserListRequest:
+                            var users = _dbManager.GetAllUsers();
+                            writer.WriteLine(PacketSerializer.Serialize(new Packet { Type = PacketType.GetUserListResponse, Message = PacketSerializer.SerializeData(users) }));
+                            break;
 
-                        // Segurtasuna: Moderatzailea ezin da aldatu (aukerakoa)
-                        if (roleReq.Username == "moderator") break;
+                        // Admin Kudeaketa (Ban, CreateUser, UpdateRole...)
+                        // Hauek hemen kudeatu daitezke
+                        case PacketType.BanUserRequest:
+                            var banTarget = PacketSerializer.DeserializeData<User>(packet.Message);
+                            _dbManager.SetUserBanStatus(banTarget.Username, banTarget.IsBanned);
+                            // Oharra: Kick egiteko, bilatu zein gelatan dagoen eta bota
+                            break;
 
-                        _dbManager.UpdateUserRole(roleReq.Username, roleReq.NewRole);
-                        Console.WriteLine($"[ADMIN] {roleReq.Username}-ren rola aldatuta: {roleReq.NewRole}");
+                        case PacketType.UpdateUserRoleRequest:
+                            var roleReq = PacketSerializer.DeserializeData<UpdateRoleRequest>(packet.Message);
+                            _dbManager.UpdateUserRole(roleReq.Username, roleReq.NewRole);
+                            break;
 
-                        // Ez dugu erantzunik bidali behar derrigorrez, 
-                        // adminak dagoeneko ikusten duelako aldaketa pantailan.
-                        break;
+                        case PacketType.CreateUserRequest:
+                            var createReq = PacketSerializer.DeserializeData<CreateUserRequest>(packet.Message);
+                            bool created = _dbManager.CreateUserWithRole(createReq.Username, createReq.Password, createReq.Role);
+                            writer.WriteLine(PacketSerializer.Serialize(new Packet { Type = PacketType.CreateUserResponse, Message = created ? "OK" : "ERROR" }));
+                            break;
+
+                        case PacketType.AddWordRequest:
+                            var wordReq = PacketSerializer.DeserializeData<NewWordRequest>(packet.Message);
+                            bool added = _dbManager.AddNewWord(wordReq.Category, wordReq.Word);
+                            writer.WriteLine(PacketSerializer.Serialize(new Packet { Type = PacketType.AddWordResponse, Message = added ? "OK" : "EXISTS" }));
+                            break;
+                    }
                 }
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[ERROR] Konexioa galdu da: {ex.Message}");
+            Console.WriteLine($"[ERROR] {clientId} deskonektatu da: {ex.Message}");
         }
         finally
         {
-            // Deskonektatzean, zerrendatik kendu
-            _clients.TryRemove(clientId, out _);
-            _clientNames.TryRemove(clientId, out _);
-            BroadcastPlayerList();
+            // DESKONEXIOA GARBITU
+
+            // 1. Begiratu ea gela batean zegoen
+            if (_clientRoomMap.TryGetValue(clientId, out string code))
+            {
+                if (_activeRooms.TryGetValue(code, out GameRoom room))
+                {
+                    room.RemovePlayer(clientId);
+
+                    // Aukerakoa: Gela hutsik badago, ezabatu memoriatik
+                    // (Hau konplexuagoa da GameRoom barruan zenbatu beharko litzatekeelako)
+                }
+                _clientRoomMap.TryRemove(clientId, out _);
+            }
+
+            _tempClientNames.TryRemove(clientId, out _);
             client.Close();
-            Console.WriteLine("[THREAD] Bezeroa deskonektatu da.");
         }
-    }
+    
+}
 
     // Mezu bat denei bidaltzeko metodoa
     public static void BroadcastPacket(Packet packet)
@@ -1059,5 +949,12 @@ class Program
             // Zerrenda eguneratua bidali denei
             BroadcastPlayerList();
         }
+    }
+
+    private static string GenerateRoomCode()
+    {
+        const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        Random random = new Random();
+        return new string(Enumerable.Repeat(chars, 5).Select(s => s[random.Next(s.Length)]).ToArray());
     }
 }

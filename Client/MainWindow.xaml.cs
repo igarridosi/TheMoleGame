@@ -78,10 +78,11 @@ namespace Client
                     User loggedUser = PacketSerializer.DeserializeData<User>(response.Message);
 
                     // 2. Leiho berria sortu, konexioa eta erabiltzailea pasatuz
-                    GameWindow gameWindow = new GameWindow(_server, loggedUser);
+                    MenuWindow menuWin = new MenuWindow(_server, loggedUser);
+
 
                     // 3. Leiho berria erakutsi
-                    gameWindow.Show();
+                    menuWin.Show();
 
                     // 4. Leiho hau itxi
                     this.Close();

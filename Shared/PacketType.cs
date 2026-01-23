@@ -61,5 +61,14 @@ namespace Shared
         CreateUserRequest, // Moderatzailea -> Server
         CreateUserResponse, // Server -> Moderatzailea
         UpdateUserRoleRequest,
+
+        // GELA KUDEAKETA
+        CreateRoomRequest,  // Client -> Server: "Gela bat nahi dut"
+        CreateRoomResponse, // Server -> Client: "Hau da kodea: X5J9P"
+
+        JoinRoomRequest,    // Client -> Server: "X5J9P gelan sartu nahi dut"
+        JoinRoomResponse,    // Server -> Client: "OK" edo "Ez da existitzen"
+
+        RequestPlayerList, // Client -> Server: "Bidali zerrenda"
     }
 }

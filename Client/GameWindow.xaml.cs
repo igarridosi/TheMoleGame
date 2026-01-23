@@ -26,14 +26,23 @@ namespace Client
         private InputWordWindow _currentInputWindow; // Leiho irekia gordetzeko
         private AdminUsersWindow _adminUsersWindow;
 
+        private bool _isHost;
+
         public ObservableCollection<PlayerState> Players { get; set; } = new ObservableCollection<PlayerState>();
 
         // Eraikitzailea aldatu dugu parametroak jasotzeko!
-        public GameWindow(ServerConnection server, User user)
+        public GameWindow(ServerConnection server, User user, bool isHost)
         {
             InitializeComponent();
             _server = server;
             _currentUser = user;
+            _isHost = isHost;
+
+            // Botoia erakutsi Host bada (Admin rola ahaztu)
+            if (_isHost)
+            {
+                btnStartGame.Visibility = Visibility.Visible;
+            }
 
             // 1. Datuen lotura (Binding) zerrendarako
             lstPlayers.ItemsSource = Players;
@@ -46,7 +55,7 @@ namespace Client
             AddSystemMessage("Lobby-ra konektatuta. Partida hasi arte itxaron...");
             lblUserInfo.Text = $"(Erabiltzailea: {_currentUser.Username})";
 
-            // --- ADMIN LOGIKA ---
+            /* --- ADMIN LOGIKA ---
             if (_currentUser.IsAdmin)
             {
                 btnStartGame.Visibility = Visibility.Visible;
@@ -55,6 +64,7 @@ namespace Client
                 // Adminari 'Rematch' botoia ere erakutsi behar zaio partida amaitzean, 
                 // baina hasieran ezkutuan egon behar du (defektuz Collapsed dago XAML-en).
             }
+            */
 
             // --- MODERATZAILE LOGIKA (BERRIA) ---
             // Erabiltzailea 'moderator' bada, Panel Berezia erakutsi
@@ -79,6 +89,16 @@ namespace Client
 
             // 3. ENTZUN (Atzeko planoan)
             Task.Run(() => ReceiveLoop());
+
+            // Leihoa ireki bezain laster, zerrenda eguneratua eskatu
+            RequestListUpdate();
+        }
+
+        private async void RequestListUpdate()
+        {
+            // Atzerapen txiki bat leihoa guztiz kargatu dadin
+            await Task.Delay(500);
+            await _server.SendPacketAsync(new Packet { Type = PacketType.RequestPlayerList });
         }
 
         // Metodo honek etengabe entzungo du zerbitzaria
