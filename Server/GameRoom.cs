@@ -125,6 +125,49 @@ namespace Server
                         ResetGame();
                     }
                     break;
+
+                case PacketType.GetStatsRequest:
+                    try
+                    {
+                        // 1. Nire izena lortu (Gela barruko zerrendatik)
+                        string myName = _clientNames.ContainsKey(clientId) ? _clientNames[clientId] : "";
+
+                        // 2. Datuak DBtik irakurri
+                        int myDbId = _dbManager.GetUserIdByName(myName);
+                        var stats = _dbManager.GetUserStats(myDbId);
+
+                        // 3. Bezeroari zuzenean erantzun (ez Broadcast)
+                        if (_clients.TryGetValue(clientId, out StreamWriter myWriter))
+                        {
+                            myWriter.WriteLine(PacketSerializer.Serialize(new Packet
+                            {
+                                Type = PacketType.GetStatsResponse,
+                                Message = PacketSerializer.SerializeData(stats)
+                            }));
+                        }
+                    }
+                    catch { }
+                    break;
+
+                case PacketType.GetRankingRequest:
+                    try
+                    {
+                        // DBtik ranking orokorra lortu
+                        var list = _dbManager.GetGlobalRanking();
+                        var gStats = _dbManager.GetGlobalStats();
+
+                        // Bidali
+                        if (_clients.TryGetValue(clientId, out StreamWriter myWriter))
+                        {
+                            myWriter.WriteLine(PacketSerializer.Serialize(new Packet
+                            {
+                                Type = PacketType.GetRankingResponse,
+                                Message = PacketSerializer.SerializeData(new RankingPayload { List = list, Stats = gStats })
+                            }));
+                        }
+                    }
+                    catch { }
+                    break;
             }
         }
 

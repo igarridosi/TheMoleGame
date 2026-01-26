@@ -39,7 +39,7 @@ namespace Client
             _isHost = isHost;
 
             // Botoia erakutsi Host bada (Admin rola ahaztu)
-            if (_isHost)
+            if (isHost)
             {
                 btnStartGame.Visibility = Visibility.Visible;
             }
@@ -55,16 +55,11 @@ namespace Client
             AddSystemMessage("Lobby-ra konektatuta. Partida hasi arte itxaron...");
             lblUserInfo.Text = $"(Erabiltzailea: {_currentUser.Username})";
 
-            /* --- ADMIN LOGIKA ---
-            if (_currentUser.IsAdmin)
+            if (_currentUser.Role == "moderator")
             {
-                btnStartGame.Visibility = Visibility.Visible;
                 btnAdminWords.Visibility = Visibility.Visible; // Hitzak gehitzeko botoia
-
-                // Adminari 'Rematch' botoia ere erakutsi behar zaio partida amaitzean, 
-                // baina hasieran ezkutuan egon behar du (defektuz Collapsed dago XAML-en).
             }
-            */
+            
 
             // --- MODERATZAILE LOGIKA (BERRIA) ---
             // Erabiltzailea 'moderator' bada, Panel Berezia erakutsi
@@ -230,8 +225,8 @@ namespace Client
 
                     MessageBox.Show($"JOKOA AMAITU DA!\n\nIRABAZLEA: {winner}", "GAME OVER", MessageBoxButton.OK, MessageBoxImage.Information);
 
-                    // Admin bada, botoia erakutsi
-                    if (_currentUser.IsAdmin)
+                    // Host bada, botoia erakutsi
+                    if (_isHost)
                     {
                         btnRestart.Visibility = Visibility.Visible;
                     }
@@ -474,7 +469,7 @@ namespace Client
         private void HandleRestartInvite()
         {
             // Adminak zuzenean reset egiten du (berak eman diolako botoiari)
-            if (_currentUser.IsAdmin)
+            if (_isHost)
             {
                 ResetClientUI();
                 return;
@@ -519,7 +514,7 @@ namespace Client
             btnRestart.Visibility = Visibility.Collapsed;
 
             // Admin bada, "Hasi" botoia berriro erakutsi
-            if (_currentUser.IsAdmin)
+            if (_isHost)
             {
                 btnStartGame.Visibility = Visibility.Visible;
             }
