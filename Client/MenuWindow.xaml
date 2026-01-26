@@ -5,117 +5,170 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Client"
         mc:Ignorable="d"
-        Title="The Mole Game - Menua" Height="400" Width="500"
+        Title="The Mole - Menua" Height="450" Width="550"
         WindowStartupLocation="CenterScreen" ResizeMode="NoResize"
         Background="#1E1E1E">
 
-    <Border Padding="30">
+    <Border Padding="20">
         <Grid>
-            <!-- IZENBURUA -->
-            <TextBlock Text="THE MOLE GAME" 
-                       Foreground="#00ADB5" FontSize="30" FontWeight="Bold" 
-                       HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,20,0,20"/>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <!-- 0: Izenburua -->
+                <RowDefinition Height="*"/>
+                <!-- 1: Edukia -->
+            </Grid.RowDefinitions>
 
-            <!-- 1. PANELA: BOTOI NAGUSIAK (Sortu / Sartu) -->
-            <StackPanel x:Name="pnlMainButtons" VerticalAlignment="Center">
+            <!-- IZENBURUA (Beti goian) -->
+            <TextBlock Text="THE MOLE GAME" Grid.Row="0"
+                       Foreground="#00ADB5" FontSize="42" FontWeight="Bold" 
+                       HorizontalAlignment="Center" Margin="0,25,0,0">
+                <TextBlock.Effect>
+                    <DropShadowEffect Color="#00ADB5" BlurRadius="10" ShadowDepth="0" Opacity="0.4"/>
+                </TextBlock.Effect>
+            </TextBlock>
 
-                <!-- SORTU PARTIDA -->
-                <Button x:Name="btnCreateMode" Content="SORTU PARTIDA BERRIA" 
-                        Height="50" Margin="0,0,0,20"
+            <!-- ========================================================= -->
+            <!-- 1. PANELA: BOTOI NAGUSIAK -->
+            <!-- ========================================================= -->
+            <StackPanel x:Name="pnlMainButtons" Grid.Row="1" VerticalAlignment="Center">
+                <Button Content="SORTU PARTIDA BERRIA" Height="55" Margin="0,0,0,20"
                         Background="#00ADB5" Foreground="White" FontWeight="Bold" FontSize="16"
-                        BorderThickness="0" Cursor="Hand"
-                        Click="BtnCreateMode_Click">
-                    <Button.Resources>
-                        <Style TargetType="Border">
-                            <Setter Property="CornerRadius" Value="8"/>
-                        </Style>
-                    </Button.Resources>
+                        BorderThickness="0" Cursor="Hand" Click="BtnCreateMode_Click">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="bd" Background="{TemplateBinding Background}" CornerRadius="8">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="bd" Property="Background" Value="#008C93"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
                 </Button>
 
-                <!-- SARTU PARTIDARA -->
-                <Button x:Name="btnJoinMode" Content="SARTU KODE BATEKIN" 
-                        Height="50"
-                        Background="#333333" Foreground="White" FontWeight="Bold" FontSize="16"
-                        BorderBrush="#00ADB5" BorderThickness="2" Cursor="Hand"
-                        Click="BtnJoinMode_Click">
-                    <Button.Resources>
-                        <Style TargetType="Border">
-                            <Setter Property="CornerRadius" Value="8"/>
-                        </Style>
-                    </Button.Resources>
+                <Button Content="SARTU KODE BATEKIN" Height="55"
+                        Background="Transparent" Foreground="White" FontWeight="Bold" FontSize="16"
+                        BorderBrush="#00ADB5" BorderThickness="2" Cursor="Hand" Click="BtnJoinMode_Click">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="2" CornerRadius="8">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="bd" Property="Background" Value="#222"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
                 </Button>
             </StackPanel>
 
-            <!-- 2. PANELA: PARTIDA SORTU (Kodea erakusten du) -->
-            <StackPanel x:Name="pnlCreate" VerticalAlignment="Center" Visibility="Collapsed">
-                <TextBlock Text="ZURE PARTIDAREN KODEA:" Foreground="Gray" HorizontalAlignment="Center" Margin="0,0,0,10"/>
+            <!-- ========================================================= -->
+            <!-- 2. PANELA: PARTIDA SORTU (Kodea) -->
+            <!-- ========================================================= -->
+            <Grid x:Name="pnlCreate" Grid.Row="1" VerticalAlignment="Center" Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
 
-                <!-- KODEA -->
-                <Border Background="#333333" CornerRadius="5" Padding="10" Margin="0,0,0,20" Width="200">
-                    <TextBlock x:Name="lblRoomCode" Text="-----" 
-                               Foreground="#FFD700" FontSize="32" FontWeight="Bold" 
-                               HorizontalAlignment="Center"/>
+                <TextBlock Text="ZURE PARTIDAREN KODEA:" Foreground="Gray" HorizontalAlignment="Center" Margin="0,0,0,15"/>
+
+                <!-- KODEAREN KAXA (KLIKAGARRIA) -->
+                <Border x:Name="brdCodeBox" Grid.Row="1"
+                        Background="#252526" CornerRadius="10" Margin="0,0,0,10" Width="280" Height="90"
+                        Cursor="Hand" MouseLeftButtonDown="CodesBox_Click"
+                        BorderBrush="Transparent" BorderThickness="2">
+
+                    <Grid>
+                        <!-- KODEA (Hasieran ikusgai) -->
+                        <TextBlock x:Name="lblRoomCode" Text="-----" 
+                                   Foreground="#FFD700" FontSize="42" FontWeight="Black" 
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   Visibility="Visible"/>
+
+                        <!-- MEZUA (Hasieran ezkutuan) -->
+                        <StackPanel x:Name="pnlCopiedMessage" Visibility="Collapsed" VerticalAlignment="Center">
+                            <TextBlock Text="✅" FontSize="24" HorizontalAlignment="Center" Foreground="#00ADB5" Margin="0,0,0,5"/>
+                            <TextBlock Text="KOPIATUTA!" Foreground="#00ADB5" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Style.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="#333333"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
                 </Border>
 
-                <TextBlock Text="Eman kode hau lagunei." Foreground="#555" HorizontalAlignment="Center" Margin="0,0,0,20" FontStyle="Italic"/>
+                <TextBlock Grid.Row="2" Text="Egin klik kodean kopiatzeko." Foreground="#555" HorizontalAlignment="Center" Margin="0,0,0,30" FontStyle="Italic" FontSize="12"/>
 
-                <Button x:Name="btnContinueToLobby" Content="JARRAITU LOBBY-RA ->" 
-                        Height="45" Width="250"
-                        Background="#00ADB5" Foreground="White" FontWeight="Bold"
-                        BorderThickness="0" Cursor="Hand"
-                        Click="BtnContinueToLobby_Click" Visibility="Collapsed">
-                    <!-- Hasieran ezkutuan kodea jaso arte -->
+                <Button x:Name="btnContinueToLobby" Grid.Row="3" Content="JARRAITU LOBBY-RA  ➜" 
+                        Height="50" Width="280" Background="#00ADB5" Foreground="White" FontWeight="Bold" FontSize="14"
+                        BorderThickness="0" Cursor="Hand" Click="BtnContinueToLobby_Click" Visibility="Collapsed">
                     <Button.Resources>
                         <Style TargetType="Border">
-                            <Setter Property="CornerRadius" Value="5"/>
+                            <Setter Property="CornerRadius" Value="8"/>
+                        </Style>
+                    </Button.Resources>
+                </Button>
+                <Button Grid.Row="4" Content="Atzera" Click="BtnBack_Click" Width="50" Background="Transparent" Foreground="Gray" BorderThickness="0" Margin="0,15,0,0" Cursor="Hand">
+                    <Button.Resources>
+                        <Style TargetType="Border">
+                            <Setter Property="CornerRadius" Value="2"/>
                         </Style>
                     </Button.Resources>
                 </Button>
 
-                <Button Content="Atzera" Click="BtnBack_Click" Background="Transparent" Foreground="Gray" BorderThickness="0" Margin="0,10,0,0"/>
-            </StackPanel>
+                
+            </Grid>
 
-            <!-- 3. PANELA: SARTU PARTIDARA (Kodea eskatzen du) -->
-            <StackPanel x:Name="pnlJoin" VerticalAlignment="Center" Visibility="Collapsed">
-                <TextBlock Text="SARTU PARTIDAREN KODEA:" Foreground="Gray" HorizontalAlignment="Center" Margin="0,0,0,10"/>
+            <!-- ========================================================= -->
+            <!-- 3. PANELA: SARTU PARTIDARA -->
+            <!-- ========================================================= -->
+            <StackPanel x:Name="pnlJoin" Grid.Row="1" VerticalAlignment="Center" Visibility="Collapsed">
+                <TextBlock Text="SARTU PARTIDAREN KODEA:" Foreground="Gray" HorizontalAlignment="Center" Margin="0,0,0,15"/>
 
-                <TextBox x:Name="txtCodeInput" 
-                         Height="45" Width="200" 
-                         FontSize="24" FontWeight="Bold" CharacterCasing="Upper"
+                <TextBox x:Name="txtCodeInput" Height="50" Width="220" 
+                         FontSize="28" FontWeight="Bold" CharacterCasing="Upper"
                          HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
-                         Background="#333333" Foreground="White" BorderBrush="#00ADB5"
-                         Margin="0,0,0,20" MaxLength="5"/>
+                         Background="#252526" Foreground="White" BorderBrush="#00ADB5" 
+                         CaretBrush="White" Margin="0,0,0,25" MaxLength="5"/>
 
-                <Button x:Name="btnJoinGame" Content="SARTU ORAIN" 
-                        Height="45" Width="200"
+                <Button x:Name="btnJoinGame" Content="SARTU ORAIN" Height="50" Width="220"
                         Background="#00ADB5" Foreground="White" FontWeight="Bold"
-                        BorderThickness="0" Cursor="Hand"
-                        Click="BtnJoinGame_Click">
+                        BorderThickness="0" Cursor="Hand" Click="BtnJoinGame_Click">
                     <Button.Resources>
                         <Style TargetType="Border">
-                            <Setter Property="CornerRadius" Value="5"/>
+                            <Setter Property="CornerRadius" Value="8"/>
                         </Style>
                     </Button.Resources>
                 </Button>
 
-                <Button Content="Atzera" Click="BtnBack_Click" Background="Transparent" Foreground="Gray" BorderThickness="0" Margin="0,10,0,0"/>
+                <Button Content="Atzera" Click="BtnBack_Click" Width="50" Background="Transparent" Foreground="Gray" BorderThickness="0" Margin="0,15,0,0" Cursor="Hand">
+                    <Button.Resources>
+                        <Style TargetType="Border">
+                            <Setter Property="CornerRadius" Value="2"/>
+                        </Style>
+                    </Button.Resources>
+                </Button>
             </StackPanel>
 
-            <!-- 4. PANELA: MODERATZAILEA (Partidak Aukeratu) -->
-            <StackPanel x:Name="pnlModeratorRooms" VerticalAlignment="Center" Visibility="Collapsed">
-                <TextBlock Text="PARTIDA AKTIBOAK:" Foreground="#00ADB5" FontSize="14" FontWeight="Bold" Margin="0,60,0,15"/>
-
-                <ListBox x:Name="lstRooms" Height="100" Background="#333333" Foreground="White" Margin="0,0,0,20">
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="Gela Kodea: " Foreground="Gray"/>
-                                <TextBlock Text="{Binding}" FontWeight="Bold" Foreground="Yellow" Margin="10,0,0,0"/>
-                            </StackPanel>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
-
+            <!-- 4. PANELA: MODERATZAILEA (Jada badaukazu, hemen doa...) -->
+            <StackPanel x:Name="pnlModeratorRooms" Grid.Row="1" VerticalAlignment="Center" Visibility="Collapsed">
+                <!-- Zure moderatzaile kodea hemen mantendu -->
+                <TextBlock Text="PARTIDA AKTIBOAK:" Foreground="White" FontSize="14" FontWeight="Bold" Margin="0,0,0,10"/>
+                <ListBox x:Name="lstRooms" Height="120" Background="#333333" Foreground="White" Margin="0,0,0,10"/>
                 <Button Content="SARTU HAUTATUTAKOAN" Click="BtnJoinSelected_Click" Height="40" Background="#00ADB5" Foreground="White"/>
                 <Button Content="ZERRENDA FRESKATU" Click="BtnRefreshRooms_Click" Height="30" Margin="0,10,0,0" Background="#444444" Foreground="White"/>
             </StackPanel>

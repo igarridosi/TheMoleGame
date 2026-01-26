@@ -32,12 +32,14 @@ namespace Client
         public ObservableCollection<PlayerState> Players { get; set; } = new ObservableCollection<PlayerState>();
 
         // Eraikitzailea aldatu dugu parametroak jasotzeko!
-        public GameWindow(ServerConnection server, User user, bool isHost)
+        public GameWindow(ServerConnection server, User user, bool isHost, string roomCode)
         {
             InitializeComponent();
             _server = server;
             _currentUser = user;
             _isHost = isHost;
+
+            lblCurrentRoomCode.Text = roomCode;
 
             // Botoia erakutsi Host bada (Admin rola ahaztu)
             if (isHost)

@@ -370,27 +370,35 @@
 
             <Grid Grid.Row="0" Margin="0,0,0,10">
                 <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <!-- Ronda Info -->
                 </Grid.ColumnDefinitions>
 
-                <StackPanel Orientation="Horizontal">
+                <!-- Titulua eta Erabiltzailea -->
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <TextBlock Text="GELA NAGUSIA" Foreground="White" FontSize="20" FontWeight="Light"/>
-                    <TextBlock x:Name="lblUserInfo" Text="..." Foreground="Gray" VerticalAlignment="Center" Margin="15,0,0,0"/>
+                    <TextBlock x:Name="lblUserInfo" Text="..." Foreground="Gray" FontSize="14" VerticalAlignment="Center" Margin="15,0,0,0"/>
                 </StackPanel>
 
 
-                <!-- RONDA KONTAGAILUA -->
-                <Border Grid.Column="1" Background="#333333" CornerRadius="5" Padding="10,5">
+                <!-- KODEA (Berria) -->
+                <Border Grid.Column="2" Background="#222" CornerRadius="5" Padding="10,5" Margin="0,0,10,0" BorderBrush="#444" BorderThickness="1">
                     <StackPanel Orientation="Horizontal">
-                        <!-- RONDA -->
-                        <TextBlock Text="RONDA: " Foreground="Gray" FontWeight="Bold"/>
-                        <TextBlock x:Name="lblRoundInfo" Text="1 / 3" Foreground="#00ADB5" FontWeight="Bold" Margin="0,0,15,0"/>
+                        <TextBlock Text="KODEA: " Foreground="Gray" FontSize="11" FontWeight="Bold" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="lblCurrentRoomCode" Text="-----" Foreground="#FFD700" FontWeight="Bold" FontSize="14" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
 
-                        <!-- ERLOJUA (BERRIA) -->
-                        <TextBlock Text="⏱ " Foreground="White"/>
-                        <TextBlock x:Name="lblTimer" Text="--" Foreground="#FF5555" FontWeight="Bold" Width="25"/>
+                <!-- RONDA -->
+                <Border Grid.Column="3" Background="#333" CornerRadius="5" Padding="10,5">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="RONDA: " Foreground="Gray" FontWeight="Bold" FontSize="11" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="lblRoundInfo" Text="1 / 3" Foreground="#00ADB5" FontWeight="Bold" Margin="5,0,15,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="⏱ " Foreground="White" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="lblTimer" Text="--" Foreground="White" FontWeight="Bold" Width="20" VerticalAlignment="Center"/>
                     </StackPanel>
                 </Border>
 

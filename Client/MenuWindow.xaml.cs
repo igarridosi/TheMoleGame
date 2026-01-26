@@ -13,6 +13,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
+using System.Windows.Media.Animation;
 
 namespace Client
 {
@@ -21,8 +22,6 @@ namespace Client
         private ServerConnection _server;
         private User _currentUser;
         private string _myRoomCode;
-
-        // KONPONKETA: Semaforoa (Bakarrik hari bat pasatzen uzteko irakurketara)
         private SemaphoreSlim _readLock = new SemaphoreSlim(1, 1);
 
         public MenuWindow(ServerConnection server, User user)
@@ -38,6 +37,34 @@ namespace Client
                 RequestRooms();
             }
         }
+
+        // --- KLIK GAKOA: KODEA KOPIATU ---
+        private async void CodesBox_Click(object sender, MouseButtonEventArgs e)
+        {
+            if (lblRoomCode.Text == "-----" || lblRoomCode.Text == "") return;
+
+            try
+            {
+                // 1. Kopiatu (Errore isila)
+                try { Clipboard.SetText(lblRoomCode.Text); } catch { }
+
+                // 2. Animazioa: Kodea ezkutatu, Mezua erakutsi
+                lblRoomCode.Visibility = Visibility.Collapsed;
+                pnlCopiedMessage.Visibility = Visibility.Visible;
+                brdCodeBox.BorderBrush = System.Windows.Media.Brushes.Turquoise;
+
+                // 3. Itxaron
+                await Task.Delay(1500);
+
+                // 4. Itzuli
+                pnlCopiedMessage.Visibility = Visibility.Collapsed;
+                lblRoomCode.Visibility = Visibility.Visible;
+                brdCodeBox.BorderBrush = System.Windows.Media.Brushes.Transparent;
+            }
+            catch { }
+        }
+
+        // --- BESTE BOTOIAK (Aurreko berdinak) ---
 
         private void BtnCreateMode_Click(object sender, RoutedEventArgs e)
         {
@@ -63,16 +90,12 @@ namespace Client
             txtCodeInput.Text = "";
         }
 
-        // --- LOGIKA ---
-
         private async void RequestCreateRoom()
         {
-            // LOCK SARTU
             await _readLock.WaitAsync();
             try
             {
-                var packet = new Packet { Type = PacketType.CreateRoomRequest };
-                await _server.SendPacketAsync(packet);
+                await _server.SendPacketAsync(new Packet { Type = PacketType.CreateRoomRequest });
 
                 while (true)
                 {
@@ -88,30 +111,7 @@ namespace Client
                     }
                 }
             }
-            finally
-            {
-                _readLock.Release(); // BETI ASKATU
-            }
-        }
-
-        private async void RequestRooms()
-        {
-            await _readLock.WaitAsync();
-            try
-            {
-                await _server.SendPacketAsync(new Packet { Type = PacketType.GetRoomsRequest });
-
-                Packet response = await _server.ReadPacketAsync();
-                if (response != null && response.Type == PacketType.GetRoomsResponse)
-                {
-                    var rooms = PacketSerializer.DeserializeData<List<string>>(response.Message);
-                    lstRooms.ItemsSource = rooms;
-                }
-            }
-            finally
-            {
-                _readLock.Release();
-            }
+            finally { _readLock.Release(); }
         }
 
         private void BtnContinueToLobby_Click(object sender, RoutedEventArgs e)
@@ -129,48 +129,6 @@ namespace Client
             await _readLock.WaitAsync();
             try
             {
-                var packet = new Packet { Type = PacketType.JoinRoomRequest, Message = code };
-                await _server.SendPacketAsync(packet);
-
-                while (true)
-                {
-                    Packet response = await _server.ReadPacketAsync();
-                    if (response == null) break;
-
-                    if (response.Type == PacketType.JoinRoomResponse)
-                    {
-                        if (response.Message == "OK")
-                        {
-                            OpenGameWindow(false);
-                        }
-                        else
-                        {
-                            MessageBox.Show("ERROREA: " + response.Message);
-                            btnJoinGame.IsEnabled = true;
-                        }
-                        break;
-                    }
-                }
-            }
-            finally
-            {
-                _readLock.Release();
-            }
-        }
-
-        private async void BtnJoinSelected_Click(object sender, RoutedEventArgs e)
-        {
-            if (lstRooms.SelectedItem == null)
-            {
-                MessageBox.Show("Aukeratu partida bat zerrendatik.");
-                return;
-            }
-
-            string code = lstRooms.SelectedItem.ToString();
-
-            await _readLock.WaitAsync();
-            try
-            {
                 await _server.SendPacketAsync(new Packet { Type = PacketType.JoinRoomRequest, Message = code });
 
                 while (true)
@@ -180,34 +138,71 @@ namespace Client
 
                     if (response.Type == PacketType.JoinRoomResponse)
                     {
-                        if (response.Message == "OK")
-                        {
-                            OpenGameWindow(false);
-                        }
+                        if (response.Message == "OK") OpenGameWindow(false);
                         else
                         {
                             MessageBox.Show("ERROREA: " + response.Message);
+                            btnJoinGame.IsEnabled = true;
                         }
                         break;
                     }
                 }
             }
-            finally
-            {
-                _readLock.Release();
-            }
-        }
-
-        private void BtnRefreshRooms_Click(object sender, RoutedEventArgs e)
-        {
-            RequestRooms();
+            finally { _readLock.Release(); }
         }
 
         private void OpenGameWindow(bool isHost)
         {
-            GameWindow gameWin = new GameWindow(_server, _currentUser, isHost);
+            string finalCode = isHost ? _myRoomCode : txtCodeInput.Text.Trim().ToUpper();
+            if (lstRooms != null && lstRooms.IsVisible && lstRooms.SelectedItem != null)
+                finalCode = lstRooms.SelectedItem.ToString();
+
+            GameWindow gameWin = new GameWindow(_server, _currentUser, isHost, finalCode);
             gameWin.Show();
             this.Close();
+        }
+
+        // Moderatzaile metodoak mantendu...
+        private async void RequestRooms()
+        {
+            await _readLock.WaitAsync();
+            try
+            {
+                await _server.SendPacketAsync(new Packet { Type = PacketType.GetRoomsRequest });
+                Packet response = await _server.ReadPacketAsync();
+                if (response != null && response.Type == PacketType.GetRoomsResponse)
+                {
+                    var rooms = PacketSerializer.DeserializeData<List<string>>(response.Message);
+                    lstRooms.ItemsSource = rooms;
+                }
+            }
+            finally { _readLock.Release(); }
+        }
+
+        private void BtnRefreshRooms_Click(object sender, RoutedEventArgs e) => RequestRooms();
+
+        private async void BtnJoinSelected_Click(object sender, RoutedEventArgs e)
+        {
+            if (lstRooms.SelectedItem == null) return;
+            string code = lstRooms.SelectedItem.ToString();
+
+            await _readLock.WaitAsync();
+            try
+            {
+                await _server.SendPacketAsync(new Packet { Type = PacketType.JoinRoomRequest, Message = code });
+                while (true)
+                {
+                    Packet response = await _server.ReadPacketAsync();
+                    if (response == null) break;
+                    if (response.Type == PacketType.JoinRoomResponse)
+                    {
+                        if (response.Message == "OK") OpenGameWindow(false);
+                        else MessageBox.Show(response.Message);
+                        break;
+                    }
+                }
+            }
+            finally { _readLock.Release(); }
         }
     }
 }
