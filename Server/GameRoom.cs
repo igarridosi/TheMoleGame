@@ -13,6 +13,7 @@ namespace Server
     {
         public string RoomCode { get; private set; }
         public int HostId { get; private set; }
+        public int PlayerCount => _clients.Count;
 
         // BEZEROAK
         private ConcurrentDictionary<int, StreamWriter> _clients = new ConcurrentDictionary<int, StreamWriter>();
@@ -64,20 +65,58 @@ namespace Server
             BroadcastPlayerList();
         }
 
-        public void RemovePlayer(int clientId)
+        public List<int> RemovePlayer(int clientId)
         {
+            List<int> kickedUsers = new List<int>();
+
+            // 1. Abisatu denei atera dela
             if (_clientNames.TryGetValue(clientId, out string name))
             {
                 BroadcastPacket(new Packet { Type = PacketType.ChatMessage, Message = $"[SISTEMA] {name} gelatik atera da." });
             }
 
+            // 2. Erabiltzailea bera ezabatu
             _clients.TryRemove(clientId, out _);
             _clientNames.TryRemove(clientId, out _);
             _clientRoles.TryRemove(clientId, out _);
-
             if (!_eliminatedPlayers.Contains(clientId)) _eliminatedPlayers.Add(clientId);
 
-            BroadcastPlayerList();
+            // --- LOGIKA BERRIA: HOST-A BADA ---
+            if (clientId == HostId)
+            {
+                Console.WriteLine($"[ROOM {RoomCode}] Host atera da. Gela ixten...");
+
+                // Beste jokalari guztiak lortu
+                foreach (var otherClient in _clients)
+                {
+                    int otherId = otherClient.Key;
+                    StreamWriter writer = otherClient.Value;
+
+                    // 1. Abisua bidali (Kicked)
+                    try
+                    {
+                        Packet p = new Packet { Type = PacketType.YouAreKicked, Message = "Host-a atera da. Gela itxi egin da." };
+                        writer.WriteLine(PacketSerializer.Serialize(p));
+                    }
+                    catch { }
+
+                    // 2. Zerrendara gehitu (Program.cs-ek mapa garbitzeko)
+                    kickedUsers.Add(otherId);
+                }
+
+                // Gela garbitu
+                _clients.Clear();
+                _clientNames.Clear();
+                _clientRoles.Clear();
+            }
+
+            // Gainerakoentzat zerrenda eguneratu
+            if (_clients.Count > 0)
+            {
+                BroadcastPlayerList();
+            }
+
+            return kickedUsers; // Itzuli nor bota dugun
         }
 
         // --- PAKETEAK PROZESATU ---
@@ -167,6 +206,35 @@ namespace Server
                         }
                     }
                     catch { }
+                    break;
+
+                // GameRoom.cs -> HandlePacket barruan gehitu:
+
+                case PacketType.GetUserListRequest:
+                    var users = _dbManager.GetAllUsers();
+                    if (_clients.TryGetValue(clientId, out StreamWriter uWriter))
+                    {
+                        uWriter.WriteLine(PacketSerializer.Serialize(new Packet { Type = PacketType.GetUserListResponse, Message = PacketSerializer.SerializeData(users) }));
+                    }
+                    break;
+
+                case PacketType.BanUserRequest:
+                    var banTarget = PacketSerializer.DeserializeData<User>(packet.Message);
+                    _dbManager.SetUserBanStatus(banTarget.Username, banTarget.IsBanned);
+                    break;
+
+                case PacketType.UpdateUserRoleRequest:
+                    var roleReq = PacketSerializer.DeserializeData<UpdateRoleRequest>(packet.Message);
+                    _dbManager.UpdateUserRole(roleReq.Username, roleReq.NewRole);
+                    break;
+
+                case PacketType.CreateUserRequest:
+                    var createReq = PacketSerializer.DeserializeData<CreateUserRequest>(packet.Message);
+                    bool created = _dbManager.CreateUserWithRole(createReq.Username, createReq.Password, createReq.Role);
+                    if (_clients.TryGetValue(clientId, out StreamWriter cWriter))
+                    {
+                        cWriter.WriteLine(PacketSerializer.Serialize(new Packet { Type = PacketType.CreateUserResponse, Message = created ? "OK" : "ERROR" }));
+                    }
                     break;
             }
         }
@@ -423,7 +491,7 @@ namespace Server
 
             if (survivors < 3)
             {
-                EndGame("INPOSTOREAK IRABAZI (Gehiengoa lortu dute)");
+                EndGame("INPOSTOREAK IRABAZI");
                 return;
             }
 

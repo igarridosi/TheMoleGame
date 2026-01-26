@@ -70,5 +70,9 @@ namespace Shared
         JoinRoomResponse,    // Server -> Client: "OK" edo "Ez da existitzen"
 
         RequestPlayerList, // Client -> Server: "Bidali zerrenda"
+
+        GetRoomsRequest,  // Mod -> Server
+        GetRoomsResponse, // Server -> Mod (List<string> Codes)
+        LeaveRoomRequest  // Mod -> Server (Gelatik atera menura itzultzeko)
     }
 }

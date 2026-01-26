@@ -118,15 +118,41 @@ class Program
                 // 1. ESTRATEGIA: Begiratu ea bezeroa jada GELA batean dagoen
                 if (_clientRoomMap.TryGetValue(clientId, out string roomCode))
                 {
-                    // Gela aurkitu
                     if (_activeRooms.TryGetValue(roomCode, out GameRoom room))
                     {
-                        // Bideratu mezua gelara (Joko logika guztia han dago)
-                        room.HandlePacket(clientId, packet);
+                        if (packet.Type == PacketType.LeaveRoomRequest)
+                        {
+                            Console.WriteLine($"[ROOM] {clientId} gelatik atera da (Exit botoia).");
+
+                            // ALDAKETA: Zerrenda jaso eta prozesatu
+                            var kickedIds = room.RemovePlayer(clientId);
+
+                            // Ni mapatik kendu
+                            _clientRoomMap.TryRemove(clientId, out _);
+
+                            // Besteak (Host bada) mapatik kendu
+                            foreach (int id in kickedIds)
+                            {
+                                _clientRoomMap.TryRemove(id, out _);
+                            }
+
+                            // Gela hutsik badago, ezabatu
+                            if (room.PlayerCount == 0)
+                            {
+                                _activeRooms.TryRemove(roomCode, out _);
+                                Console.WriteLine($"[ROOM] Gela ezabatu da: {roomCode}");
+                            }
+                        }
+                        else
+                        {
+                            // Mezu normala bada, gelara bideratu
+                            room.HandlePacket(clientId, packet);
+                        }
+                        // ------------------------
                     }
                     else
                     {
-                        // Gela desagertu da? (Errore arraroa)
+                        // Gela ez bada existitzen (errorea)
                         _clientRoomMap.TryRemove(clientId, out _);
                     }
                 }
@@ -243,34 +269,14 @@ class Program
                             catch { }
                             break;
 
-                        case PacketType.GetUserListRequest:
-                            var users = _dbManager.GetAllUsers();
-                            writer.WriteLine(PacketSerializer.Serialize(new Packet { Type = PacketType.GetUserListResponse, Message = PacketSerializer.SerializeData(users) }));
-                            break;
-
-                        // Admin Kudeaketa (Ban, CreateUser, UpdateRole...)
-                        // Hauek hemen kudeatu daitezke
-                        case PacketType.BanUserRequest:
-                            var banTarget = PacketSerializer.DeserializeData<User>(packet.Message);
-                            _dbManager.SetUserBanStatus(banTarget.Username, banTarget.IsBanned);
-                            // Oharra: Kick egiteko, bilatu zein gelatan dagoen eta bota
-                            break;
-
-                        case PacketType.UpdateUserRoleRequest:
-                            var roleReq = PacketSerializer.DeserializeData<UpdateRoleRequest>(packet.Message);
-                            _dbManager.UpdateUserRole(roleReq.Username, roleReq.NewRole);
-                            break;
-
-                        case PacketType.CreateUserRequest:
-                            var createReq = PacketSerializer.DeserializeData<CreateUserRequest>(packet.Message);
-                            bool created = _dbManager.CreateUserWithRole(createReq.Username, createReq.Password, createReq.Role);
-                            writer.WriteLine(PacketSerializer.Serialize(new Packet { Type = PacketType.CreateUserResponse, Message = created ? "OK" : "ERROR" }));
-                            break;
-
-                        case PacketType.AddWordRequest:
-                            var wordReq = PacketSerializer.DeserializeData<NewWordRequest>(packet.Message);
-                            bool added = _dbManager.AddNewWord(wordReq.Category, wordReq.Word);
-                            writer.WriteLine(PacketSerializer.Serialize(new Packet { Type = PacketType.AddWordResponse, Message = added ? "OK" : "EXISTS" }));
+                        case PacketType.GetRoomsRequest:
+                            // Gela aktiboen kodeak lortu
+                            var rooms = _activeRooms.Keys.ToList();
+                            writer.WriteLine(PacketSerializer.Serialize(new Packet
+                            {
+                                Type = PacketType.GetRoomsResponse,
+                                Message = PacketSerializer.SerializeData(rooms)
+                            }));
                             break;
                     }
                 }
@@ -284,21 +290,31 @@ class Program
         {
             // DESKONEXIOA GARBITU
 
-            // 1. Begiratu ea gela batean zegoen
+            // GARBIKETA
             if (_clientRoomMap.TryGetValue(clientId, out string code))
             {
                 if (_activeRooms.TryGetValue(code, out GameRoom room))
                 {
-                    room.RemovePlayer(clientId);
+                    // ALDAKETA: Zerrenda jaso eta prozesatu
+                    var kickedIds = room.RemovePlayer(clientId);
 
-                    // Aukerakoa: Gela hutsik badago, ezabatu memoriatik
-                    // (Hau konplexuagoa da GameRoom barruan zenbatu beharko litzatekeelako)
+                    // Besteak mapatik kendu (Host bazen)
+                    foreach (int id in kickedIds)
+                    {
+                        _clientRoomMap.TryRemove(id, out _);
+                    }
+
+                    if (room.PlayerCount == 0)
+                    {
+                        _activeRooms.TryRemove(code, out _);
+                    }
                 }
                 _clientRoomMap.TryRemove(clientId, out _);
             }
 
             _tempClientNames.TryRemove(clientId, out _);
             client.Close();
+            Console.WriteLine("[THREAD] Bezeroa deskonektatu da.");
         }
     
 }

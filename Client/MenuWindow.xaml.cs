@@ -20,24 +20,29 @@ namespace Client
     {
         private ServerConnection _server;
         private User _currentUser;
-        private string _myRoomCode; // Gorde kodea
+        private string _myRoomCode;
 
-        // Constructor: Datuak jaso Login leihotik
+        // KONPONKETA: Semaforoa (Bakarrik hari bat pasatzen uzteko irakurketara)
+        private SemaphoreSlim _readLock = new SemaphoreSlim(1, 1);
+
         public MenuWindow(ServerConnection server, User user)
         {
             InitializeComponent();
             _server = server;
             _currentUser = user;
-        }
 
-        // --- INTERFAZE NABIGAZIOA ---
+            if (_currentUser.Username.ToLower() == "moderator")
+            {
+                pnlMainButtons.Visibility = Visibility.Collapsed;
+                pnlModeratorRooms.Visibility = Visibility.Visible;
+                RequestRooms();
+            }
+        }
 
         private void BtnCreateMode_Click(object sender, RoutedEventArgs e)
         {
             pnlMainButtons.Visibility = Visibility.Collapsed;
             pnlCreate.Visibility = Visibility.Visible;
-
-            // Berehala eskatu kodea zerbitzariari
             RequestCreateRoom();
         }
 
@@ -50,7 +55,6 @@ namespace Client
 
         private void BtnBack_Click(object sender, RoutedEventArgs e)
         {
-            // Reset UI
             pnlCreate.Visibility = Visibility.Collapsed;
             pnlJoin.Visibility = Visibility.Collapsed;
             pnlMainButtons.Visibility = Visibility.Visible;
@@ -63,30 +67,55 @@ namespace Client
 
         private async void RequestCreateRoom()
         {
-            var packet = new Packet { Type = PacketType.CreateRoomRequest };
-            await _server.SendPacketAsync(packet);
-
-            // Begizta: Itxaron mezu zuzena iritsi arte
-            // (Batzuetan beste mezu batzuk irits daitezke lehenago, adibidez Chat zaharrak)
-            while (true)
+            // LOCK SARTU
+            await _readLock.WaitAsync();
+            try
             {
-                Packet response = await _server.ReadPacketAsync();
-                if (response == null) break;
+                var packet = new Packet { Type = PacketType.CreateRoomRequest };
+                await _server.SendPacketAsync(packet);
 
-                if (response.Type == PacketType.CreateRoomResponse)
+                while (true)
                 {
-                    _myRoomCode = response.Message;
-                    lblRoomCode.Text = _myRoomCode;
-                    btnContinueToLobby.Visibility = Visibility.Visible;
-                    break; // Kodea lortu dugu, irten begiztatik
+                    Packet response = await _server.ReadPacketAsync();
+                    if (response == null) break;
+
+                    if (response.Type == PacketType.CreateRoomResponse)
+                    {
+                        _myRoomCode = response.Message;
+                        lblRoomCode.Text = _myRoomCode;
+                        btnContinueToLobby.Visibility = Visibility.Visible;
+                        break;
+                    }
                 }
+            }
+            finally
+            {
+                _readLock.Release(); // BETI ASKATU
+            }
+        }
+
+        private async void RequestRooms()
+        {
+            await _readLock.WaitAsync();
+            try
+            {
+                await _server.SendPacketAsync(new Packet { Type = PacketType.GetRoomsRequest });
+
+                Packet response = await _server.ReadPacketAsync();
+                if (response != null && response.Type == PacketType.GetRoomsResponse)
+                {
+                    var rooms = PacketSerializer.DeserializeData<List<string>>(response.Message);
+                    lstRooms.ItemsSource = rooms;
+                }
+            }
+            finally
+            {
+                _readLock.Release();
             }
         }
 
         private void BtnContinueToLobby_Click(object sender, RoutedEventArgs e)
         {
-            // Ni naiz HOST-a (Sortzailea)
-            // GameWindow ireki 'true' pasatuz
             OpenGameWindow(true);
         }
 
@@ -97,38 +126,87 @@ namespace Client
 
             btnJoinGame.IsEnabled = false;
 
-            var packet = new Packet { Type = PacketType.JoinRoomRequest, Message = code };
-            await _server.SendPacketAsync(packet);
-
-            // Begizta hemen ere
-            while (true)
+            await _readLock.WaitAsync();
+            try
             {
-                Packet response = await _server.ReadPacketAsync();
-                if (response == null) break;
+                var packet = new Packet { Type = PacketType.JoinRoomRequest, Message = code };
+                await _server.SendPacketAsync(packet);
 
-                if (response.Type == PacketType.JoinRoomResponse)
+                while (true)
                 {
-                    if (response.Message == "OK")
+                    Packet response = await _server.ReadPacketAsync();
+                    if (response == null) break;
+
+                    if (response.Type == PacketType.JoinRoomResponse)
                     {
-                        OpenGameWindow(false);
+                        if (response.Message == "OK")
+                        {
+                            OpenGameWindow(false);
+                        }
+                        else
+                        {
+                            MessageBox.Show("ERROREA: " + response.Message);
+                            btnJoinGame.IsEnabled = true;
+                        }
+                        break;
                     }
-                    else
-                    {
-                        MessageBox.Show("ERROREA: " + response.Message);
-                        btnJoinGame.IsEnabled = true;
-                    }
-                    break;
                 }
             }
+            finally
+            {
+                _readLock.Release();
+            }
+        }
+
+        private async void BtnJoinSelected_Click(object sender, RoutedEventArgs e)
+        {
+            if (lstRooms.SelectedItem == null)
+            {
+                MessageBox.Show("Aukeratu partida bat zerrendatik.");
+                return;
+            }
+
+            string code = lstRooms.SelectedItem.ToString();
+
+            await _readLock.WaitAsync();
+            try
+            {
+                await _server.SendPacketAsync(new Packet { Type = PacketType.JoinRoomRequest, Message = code });
+
+                while (true)
+                {
+                    Packet response = await _server.ReadPacketAsync();
+                    if (response == null) break;
+
+                    if (response.Type == PacketType.JoinRoomResponse)
+                    {
+                        if (response.Message == "OK")
+                        {
+                            OpenGameWindow(false);
+                        }
+                        else
+                        {
+                            MessageBox.Show("ERROREA: " + response.Message);
+                        }
+                        break;
+                    }
+                }
+            }
+            finally
+            {
+                _readLock.Release();
+            }
+        }
+
+        private void BtnRefreshRooms_Click(object sender, RoutedEventArgs e)
+        {
+            RequestRooms();
         }
 
         private void OpenGameWindow(bool isHost)
         {
-            // GameWindow sortu eta ireki
-            // Ziurtatu GameWindow-ek 'isHost' parametroa onartzen duela bere constructor-ean!
             GameWindow gameWin = new GameWindow(_server, _currentUser, isHost);
             gameWin.Show();
-
             this.Close();
         }
     }

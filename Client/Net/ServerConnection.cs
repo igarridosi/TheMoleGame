@@ -16,6 +16,9 @@ namespace Client.Net
         private StreamReader _reader;
         private StreamWriter _writer;
 
+        // SEMAFOROA GEHITU: Irakurketa bakarra aldi berean
+        private SemaphoreSlim _readLock = new SemaphoreSlim(1, 1);
+
         public bool IsConnected => _client != null && _client.Connected;
 
         // Zerbitzariarekin konektatu
@@ -51,10 +54,23 @@ namespace Client.Net
         {
             if (!IsConnected) return null;
 
-            string line = await _reader.ReadLineAsync();
-            if (string.IsNullOrEmpty(line)) return null;
-
-            return PacketSerializer.Deserialize(line);
+            // Itxaron txanda
+            await _readLock.WaitAsync();
+            try
+            {
+                string line = await _reader.ReadLineAsync();
+                if (string.IsNullOrEmpty(line)) return null;
+                return PacketSerializer.Deserialize(line);
+            }
+            catch
+            {
+                return null;
+            }
+            finally
+            {
+                // Beti askatu
+                _readLock.Release();
+            }
         }
     }
 }

@@ -27,6 +27,7 @@ namespace Client
         private AdminUsersWindow _adminUsersWindow;
 
         private bool _isHost;
+        private bool _isReading = true;
 
         public ObservableCollection<PlayerState> Players { get; set; } = new ObservableCollection<PlayerState>();
 
@@ -99,27 +100,16 @@ namespace Client
         // Metodo honek etengabe entzungo du zerbitzaria
         private async Task ReceiveLoop()
         {
-            while (true)
+            while (_isReading && _server.IsConnected)
             {
                 try
                 {
                     Packet packet = await _server.ReadPacketAsync();
-                    if (packet == null) break; // Konexioa itxi da
-
-                    // UI eguneratzeko, Dispatcher erabili behar da (WPF haria)
-                    Dispatcher.Invoke(() =>
-                    {
-                        HandleServerPacket(packet);
-                    });
+                    if (packet == null) break;
+                    Dispatcher.Invoke(() => HandleServerPacket(packet));
                 }
-                catch
-                {
-                    break;
-                }
+                catch { break; }
             }
-            // Konexioa galtzen bada...
-            Dispatcher.Invoke(() => MessageBox.Show("Zerbitzariarekin konexioa galdu da!"));
-            Dispatcher.Invoke(() => this.Close());
         }
 
         private async void BtnAdminWords_Click(object sender, RoutedEventArgs e)
@@ -327,6 +317,16 @@ namespace Client
                         MessageBox.Show("Erabiltzailea ondo sortu da!", "Arrakasta", MessageBoxButton.OK, MessageBoxImage.Information);
                     else
                         MessageBox.Show("ERROREA: Erabiltzailea existitzen da edo zerbait gaizki joan da.", "Errorea", MessageBoxButton.OK, MessageBoxImage.Error);
+                    break;
+
+                case PacketType.YouAreKicked:
+                    MessageBox.Show(packet.Message, "Gela Itxita", MessageBoxButton.OK, MessageBoxImage.Warning);
+
+                    // ITZULI MENURA
+                    MenuWindow menu = new MenuWindow(_server, _currentUser);
+                    menu.Show();
+
+                    this.Close();
                     break;
             }
         }
@@ -605,6 +605,22 @@ namespace Client
             // Eskatu rankinga zerbitzariari
             var packet = new Packet { Type = PacketType.GetRankingRequest };
             await _server.SendPacketAsync(packet);
+        }
+
+        private async void BtnExitRoom_Click(object sender, RoutedEventArgs e)
+        {
+            // 1. BEGIZTA GELDITU
+            _isReading = false;
+
+            // 2. Zerbitzariari abisatu
+            await _server.SendPacketAsync(new Packet { Type = PacketType.LeaveRoomRequest });
+
+            // 3. Leiho berria
+            MenuWindow menu = new MenuWindow(_server, _currentUser);
+            menu.Show();
+
+            // 4. Hau itxi
+            this.Close();
         }
     }
 }

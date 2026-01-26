@@ -147,7 +147,7 @@
                 </Grid.RowDefinitions>
 
                 <TextBlock Text="JOKALARIAK" Foreground="#00ADB5" FontWeight="Bold" FontSize="16" Margin="0,0,0,10"/>
-
+                <Button Content="← EXIT ROOM" Click="BtnExitRoom_Click" BorderBrush="#00ADB5" BorderThickness="1" Background="#555" Foreground="#00ADB5" FontWeight="Bold" FontSize="8" Width="70" Height="20" Margin="140,0,0,7"/>
                 <!-- Jokalarien zerrenda -->
                 <ListBox x:Name="lstPlayers" Grid.Row="1" 
                          Foreground="White"
