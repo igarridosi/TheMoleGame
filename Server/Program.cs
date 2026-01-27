@@ -270,12 +270,25 @@ class Program
                             break;
 
                         case PacketType.GetRoomsRequest:
-                            // Gela aktiboen kodeak lortu
-                            var rooms = _activeRooms.Keys.ToList();
+                            // Formatua: "KODEA|HOST|COUNT"
+                            List<string> roomDetails = new List<string>();
+
+                            foreach (var kvp in _activeRooms)
+                            {
+                                string code = kvp.Key;
+                                GameRoom room = kvp.Value;
+
+                                // Izenak lortu
+                                string roomHostName = "Unknown";
+
+                                string info = $"{code}|{room.roomHostName}|{room.PlayerCount}";
+                                roomDetails.Add(info);
+                            }
+
                             writer.WriteLine(PacketSerializer.Serialize(new Packet
                             {
                                 Type = PacketType.GetRoomsResponse,
-                                Message = PacketSerializer.SerializeData(rooms)
+                                Message = PacketSerializer.SerializeData(roomDetails)
                             }));
                             break;
                     }

@@ -14,6 +14,7 @@ namespace Server
         public string RoomCode { get; private set; }
         public int HostId { get; private set; }
         public int PlayerCount => _clients.Count;
+        public string roomHostName { get; private set; }
 
         // BEZEROAK
         private ConcurrentDictionary<int, StreamWriter> _clients = new ConcurrentDictionary<int, StreamWriter>();
@@ -48,6 +49,7 @@ namespace Server
         {
             RoomCode = code;
             HostId = hostId;
+            roomHostName = hostName;
             AddPlayer(hostId, hostWriter, hostName);
         }
 

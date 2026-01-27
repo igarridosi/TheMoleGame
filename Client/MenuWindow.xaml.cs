@@ -153,27 +153,63 @@ namespace Client
 
         private void OpenGameWindow(bool isHost)
         {
+            // 1. Defektuzko balioa (Sortu badut edo idatzi badut)
             string finalCode = isHost ? _myRoomCode : txtCodeInput.Text.Trim().ToUpper();
-            if (lstRooms != null && lstRooms.IsVisible && lstRooms.SelectedItem != null)
-                finalCode = lstRooms.SelectedItem.ToString();
 
+            // 2. Moderatzailea bada eta zerrendatik aukeratu badu
+            if (lstRooms != null && lstRooms.IsVisible && lstRooms.SelectedItem != null)
+            {
+                // ALDAKETA HEMEN:
+                // Ez erabili .ToString(), baizik eta 'as RoomDisplayInfo'
+                var selectedObj = lstRooms.SelectedItem as RoomDisplayInfo;
+
+                if (selectedObj != null)
+                {
+                    finalCode = selectedObj.Code;
+                }
+            }
+
+            // 3. GameWindow ireki
             GameWindow gameWin = new GameWindow(_server, _currentUser, isHost, finalCode);
             gameWin.Show();
             this.Close();
         }
 
-        // Moderatzaile metodoak mantendu...
         private async void RequestRooms()
         {
             await _readLock.WaitAsync();
             try
             {
                 await _server.SendPacketAsync(new Packet { Type = PacketType.GetRoomsRequest });
+
                 Packet response = await _server.ReadPacketAsync();
+
                 if (response != null && response.Type == PacketType.GetRoomsResponse)
                 {
-                    var rooms = PacketSerializer.DeserializeData<List<string>>(response.Message);
-                    lstRooms.ItemsSource = rooms;
+                    // 1. Zerrenda gordina lortu (List<string>)
+                    var rawList = PacketSerializer.DeserializeData<List<string>>(response.Message);
+
+                    // 2. Zerrenda prozesatu (RoomDisplayInfo bihurtu)
+                    var displayList = new List<RoomDisplayInfo>();
+
+                    foreach (var raw in rawList)
+                    {
+                        // Formatua: "KODEA|HOST|COUNT"
+                        var parts = raw.Split('|');
+
+                        if (parts.Length >= 3)
+                        {
+                            displayList.Add(new RoomDisplayInfo
+                            {
+                                Code = parts[0],
+                                Host = parts[1],
+                                PlayerCount = parts[2]
+                            });
+                        }
+                    }
+
+                    // 3. ListBox-era esleitu
+                    lstRooms.ItemsSource = displayList;
                 }
             }
             finally { _readLock.Release(); }
@@ -183,26 +219,50 @@ namespace Client
 
         private async void BtnJoinSelected_Click(object sender, RoutedEventArgs e)
         {
-            if (lstRooms.SelectedItem == null) return;
-            string code = lstRooms.SelectedItem.ToString();
+            var selectedRoom = lstRooms.SelectedItem as RoomDisplayInfo;
+
+            if (selectedRoom == null)
+            {
+                MessageBox.Show("Aukeratu partida bat zerrendatik.");
+                return;
+            }
+
+            string code = selectedRoom.Code;
 
             await _readLock.WaitAsync();
             try
             {
                 await _server.SendPacketAsync(new Packet { Type = PacketType.JoinRoomRequest, Message = code });
+
                 while (true)
                 {
                     Packet response = await _server.ReadPacketAsync();
                     if (response == null) break;
+
                     if (response.Type == PacketType.JoinRoomResponse)
                     {
-                        if (response.Message == "OK") OpenGameWindow(false);
-                        else MessageBox.Show(response.Message);
+                        if (response.Message == "OK")
+                        {
+                            // Sartu!
+                            OpenGameWindow(false);
+                        }
+                        else
+                        {
+                            MessageBox.Show("ERROREA: " + response.Message);
+                        }
                         break;
                     }
                 }
             }
-            finally { _readLock.Release(); }
+            finally { _readLock.Release(); } 
+        }
+
+        public class RoomDisplayInfo
+        {
+            public string Code { get; set; }
+            public string Host { get; set; }
+            public string PlayerCount { get; set; }
+            public string DisplayText => $"{Code} - {Host} ({PlayerCount})"; // Debug
         }
     }
 }

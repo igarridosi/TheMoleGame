@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Client"
         mc:Ignorable="d"
-        Title="The Mole - Login" Height="450" Width="400"
+        Title="The Mole - Login" Height="500" Width="400"
         WindowStartupLocation="CenterScreen" ResizeMode="NoResize"
         Background="#1E1E1E">
     <Border Padding="20">
