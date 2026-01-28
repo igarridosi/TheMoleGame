@@ -16,13 +16,13 @@ using System.Windows.Shapes;
 
 namespace Client
 {
-    public partial class AdminPanelWindow : Window
+    public partial class WordsPanelWindow : Window
     {
         private ServerConnection _server;
         private const string NEW_CAT_OPTION = "+ Kategoria Berria Sortu...";
 
         // Constructor berria: Zerrenda jasotzen du
-        public AdminPanelWindow(ServerConnection server, List<string> existingCategories)
+        public WordsPanelWindow(ServerConnection server, List<string> existingCategories)
         {
             InitializeComponent();
             _server = server;

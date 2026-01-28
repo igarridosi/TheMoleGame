@@ -29,6 +29,10 @@ namespace Client
         private bool _isHost;
         private bool _isReading = true;
 
+        // Variables para manejar la solicitud de categorías
+        private bool _waitingForCategories = false;
+        private List<string> _receivedCategories = null;
+
         public ObservableCollection<PlayerState> Players { get; set; } = new ObservableCollection<PlayerState>();
 
         // Eraikitzailea aldatu dugu parametroak jasotzeko!
@@ -58,7 +62,7 @@ namespace Client
             AddSystemMessage("Lobby-ra konektatuta. Partida hasi arte itxaron...");
             lblUserInfo.Text = $"(Erabiltzailea: {_currentUser.Username})";
 
-            if (_currentUser.Role == "moderator")
+            if (_currentUser.Role == "Moderator")
             {
                 btnAdminWords.Visibility = Visibility.Visible; // Hitzak gehitzeko botoia
             }
@@ -116,11 +120,36 @@ namespace Client
 
         private async void BtnAdminWords_Click(object sender, RoutedEventArgs e)
         {
+            // Markatu eskabidea bidali dugula
+            _waitingForCategories = true;
+            _receivedCategories = null;
+
             // 1. Eskatu kategoriak zerbitzariari
             var packet = new Packet { Type = PacketType.GetCategoriesRequest };
             await _server.SendPacketAsync(packet);
 
-            // Orain itxaron "HandleServerPacket"-ek erantzuna jasotzeko
+            // 2. Itxaron HandleServerPacket-ek kategoriak jaso arte (max 5 segundo)
+            int waitTime = 0;
+            while (_waitingForCategories && waitTime < 5000)
+            {
+                await Task.Delay(100);
+                waitTime += 100;
+            }
+
+            // 3. Kategoria zerrenda jaso badugu, leihoa ireki
+            if (_receivedCategories != null)
+            {
+                WordsPanelWindow adminWin = new WordsPanelWindow(_server, _receivedCategories);
+                adminWin.ShowDialog();
+            }
+            else
+            {
+                MessageBox.Show("Ezin izan dira kategoriak kargatu. Saiatu berriro.", "Errorea", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+
+            // Reset
+            _waitingForCategories = false;
+            _receivedCategories = null;
         }
 
         private void HandleServerPacket(Packet packet)
@@ -253,12 +282,9 @@ namespace Client
                 case PacketType.GetCategoriesResponse:
                     var catList = PacketSerializer.DeserializeData<List<string>>(packet.Message);
 
-                    // UI Thread-ean ireki leihoa
-                    this.Dispatcher.Invoke(() =>
-                    {
-                        AdminPanelWindow adminWin = new AdminPanelWindow(_server, catList);
-                        adminWin.ShowDialog();
-                    });
+                    // Gordetzeko aldagaian gorde eta markatu jasota dagoela
+                    _receivedCategories = catList;
+                    _waitingForCategories = false;
                     break;
 
                 case PacketType.TimeUpdate:

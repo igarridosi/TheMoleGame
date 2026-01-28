@@ -22,7 +22,6 @@ namespace Client
         private ServerConnection _server;
         private User _currentUser;
         private string _myRoomCode;
-        private SemaphoreSlim _readLock = new SemaphoreSlim(1, 1);
 
         public MenuWindow(ServerConnection server, User user)
         {
@@ -34,6 +33,7 @@ namespace Client
             {
                 pnlMainButtons.Visibility = Visibility.Collapsed;
                 pnlModeratorRooms.Visibility = Visibility.Visible;
+                tbTitle.Visibility = Visibility.Collapsed;
                 RequestRooms();
             }
         }
@@ -92,26 +92,21 @@ namespace Client
 
         private async void RequestCreateRoom()
         {
-            await _readLock.WaitAsync();
-            try
+            await _server.SendPacketAsync(new Packet { Type = PacketType.CreateRoomRequest });
+
+            while (true)
             {
-                await _server.SendPacketAsync(new Packet { Type = PacketType.CreateRoomRequest });
+                Packet response = await _server.ReadPacketAsync();
+                if (response == null) break;
 
-                while (true)
+                if (response.Type == PacketType.CreateRoomResponse)
                 {
-                    Packet response = await _server.ReadPacketAsync();
-                    if (response == null) break;
-
-                    if (response.Type == PacketType.CreateRoomResponse)
-                    {
-                        _myRoomCode = response.Message;
-                        lblRoomCode.Text = _myRoomCode;
-                        btnContinueToLobby.Visibility = Visibility.Visible;
-                        break;
-                    }
+                    _myRoomCode = response.Message;
+                    lblRoomCode.Text = _myRoomCode;
+                    btnContinueToLobby.Visibility = Visibility.Visible;
+                    break;
                 }
             }
-            finally { _readLock.Release(); }
         }
 
         private void BtnContinueToLobby_Click(object sender, RoutedEventArgs e)
@@ -126,29 +121,24 @@ namespace Client
 
             btnJoinGame.IsEnabled = false;
 
-            await _readLock.WaitAsync();
-            try
+            await _server.SendPacketAsync(new Packet { Type = PacketType.JoinRoomRequest, Message = code });
+
+            while (true)
             {
-                await _server.SendPacketAsync(new Packet { Type = PacketType.JoinRoomRequest, Message = code });
+                Packet response = await _server.ReadPacketAsync();
+                if (response == null) break;
 
-                while (true)
+                if (response.Type == PacketType.JoinRoomResponse)
                 {
-                    Packet response = await _server.ReadPacketAsync();
-                    if (response == null) break;
-
-                    if (response.Type == PacketType.JoinRoomResponse)
+                    if (response.Message == "OK") OpenGameWindow(false);
+                    else
                     {
-                        if (response.Message == "OK") OpenGameWindow(false);
-                        else
-                        {
-                            MessageBox.Show("ERROREA: " + response.Message);
-                            btnJoinGame.IsEnabled = true;
-                        }
-                        break;
+                        MessageBox.Show("ERROREA: " + response.Message);
+                        btnJoinGame.IsEnabled = true;
                     }
+                    break;
                 }
             }
-            finally { _readLock.Release(); }
         }
 
         private void OpenGameWindow(bool isHost)
@@ -177,45 +167,63 @@ namespace Client
 
         private async void RequestRooms()
         {
-            await _readLock.WaitAsync();
-            try
+            await _server.SendPacketAsync(new Packet { Type = PacketType.GetRoomsRequest });
+
+            Packet response = await _server.ReadPacketAsync();
+
+            if (response != null && response.Type == PacketType.GetRoomsResponse)
             {
-                await _server.SendPacketAsync(new Packet { Type = PacketType.GetRoomsRequest });
+                // 1. Zerrenda gordina lortu (List<string>)
+                var rawList = PacketSerializer.DeserializeData<List<string>>(response.Message);
 
-                Packet response = await _server.ReadPacketAsync();
+                // 2. Zerrenda prozesatu (RoomDisplayInfo bihurtu)
+                var displayList = new List<RoomDisplayInfo>();
 
-                if (response != null && response.Type == PacketType.GetRoomsResponse)
+                foreach (var raw in rawList)
                 {
-                    // 1. Zerrenda gordina lortu (List<string>)
-                    var rawList = PacketSerializer.DeserializeData<List<string>>(response.Message);
+                    // Formatua: "KODEA|HOST|COUNT"
+                    var parts = raw.Split('|');
 
-                    // 2. Zerrenda prozesatu (RoomDisplayInfo bihurtu)
-                    var displayList = new List<RoomDisplayInfo>();
-
-                    foreach (var raw in rawList)
+                    if (parts.Length >= 3)
                     {
-                        // Formatua: "KODEA|HOST|COUNT"
-                        var parts = raw.Split('|');
-
-                        if (parts.Length >= 3)
+                        displayList.Add(new RoomDisplayInfo
                         {
-                            displayList.Add(new RoomDisplayInfo
-                            {
-                                Code = parts[0],
-                                Host = parts[1],
-                                PlayerCount = parts[2]
-                            });
-                        }
+                            Code = parts[0],
+                            Host = parts[1],
+                            PlayerCount = parts[2]
+                        });
                     }
-
-                    // 3. ListBox-era esleitu
-                    lstRooms.ItemsSource = displayList;
                 }
+
+                // 3. ListBox-era esleitu
+                lstRooms.ItemsSource = displayList;
             }
-            finally { _readLock.Release(); }
         }
 
         private void BtnRefreshRooms_Click(object sender, RoutedEventArgs e) => RequestRooms();
+
+        private async void BtnCreateTestGame_Click(object sender, RoutedEventArgs e)
+        {
+            // Moderatzaileari test partida sortzea ahalbidetu
+            await _server.SendPacketAsync(new Packet { Type = PacketType.CreateRoomRequest });
+
+            while (true)
+            {
+                Packet response = await _server.ReadPacketAsync();
+                if (response == null) break;
+
+                if (response.Type == PacketType.CreateRoomResponse)
+                {
+                    _myRoomCode = response.Message;
+                    
+                    // Zuzenean GameWindow-ra joan host gisa
+                    GameWindow gameWin = new GameWindow(_server, _currentUser, true, _myRoomCode);
+                    gameWin.Show();
+                    this.Close();
+                    break;
+                }
+            }
+        }
 
         private async void BtnJoinSelected_Click(object sender, RoutedEventArgs e)
         {
@@ -229,32 +237,27 @@ namespace Client
 
             string code = selectedRoom.Code;
 
-            await _readLock.WaitAsync();
-            try
+            await _server.SendPacketAsync(new Packet { Type = PacketType.JoinRoomRequest, Message = code });
+
+            while (true)
             {
-                await _server.SendPacketAsync(new Packet { Type = PacketType.JoinRoomRequest, Message = code });
+                Packet response = await _server.ReadPacketAsync();
+                if (response == null) break;
 
-                while (true)
+                if (response.Type == PacketType.JoinRoomResponse)
                 {
-                    Packet response = await _server.ReadPacketAsync();
-                    if (response == null) break;
-
-                    if (response.Type == PacketType.JoinRoomResponse)
+                    if (response.Message == "OK")
                     {
-                        if (response.Message == "OK")
-                        {
-                            // Sartu!
-                            OpenGameWindow(false);
-                        }
-                        else
-                        {
-                            MessageBox.Show("ERROREA: " + response.Message);
-                        }
-                        break;
+                        // Sartu!
+                        OpenGameWindow(false);
                     }
+                    else
+                    {
+                        MessageBox.Show("ERROREA: " + response.Message);
+                    }
+                    break;
                 }
             }
-            finally { _readLock.Release(); } 
         }
 
         public class RoomDisplayInfo

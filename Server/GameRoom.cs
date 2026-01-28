@@ -238,6 +238,36 @@ namespace Server
                         cWriter.WriteLine(PacketSerializer.Serialize(new Packet { Type = PacketType.CreateUserResponse, Message = created ? "OK" : "ERROR" }));
                     }
                     break;
+
+                case PacketType.GetCategoriesRequest:
+                    // Kategoriak lortu DBtik
+                    var categories = _dbManager.GetCategories();
+                    if (_clients.TryGetValue(clientId, out StreamWriter catWriter))
+                    {
+                        catWriter.WriteLine(PacketSerializer.Serialize(new Packet
+                        {
+                            Type = PacketType.GetCategoriesResponse,
+                            Message = PacketSerializer.SerializeData(categories)
+                        }));
+                    }
+                    break;
+
+                case PacketType.AddWordRequest:
+                    // Hitz berria gehitu DBra
+                    var wordReq = PacketSerializer.DeserializeData<NewWordRequest>(packet.Message);
+                    bool wordAdded = _dbManager.AddNewWord(wordReq.Category, wordReq.Word);
+
+                    string addResult = wordAdded ? "OK" : "EXISTS";
+
+                    if (_clients.TryGetValue(clientId, out StreamWriter wordWriter))
+                    {
+                        wordWriter.WriteLine(PacketSerializer.Serialize(new Packet
+                        {
+                            Type = PacketType.AddWordResponse,
+                            Message = addResult
+                        }));
+                    }
+                    break;
             }
         }
 

@@ -18,14 +18,16 @@
                 <!-- 1: Edukia -->
             </Grid.RowDefinitions>
 
+                
             <!-- IZENBURUA (Beti goian) -->
-            <TextBlock Text="THE MOLE GAME" Grid.Row="0"
-                       Foreground="#00ADB5" FontSize="42" FontWeight="Bold" 
-                       HorizontalAlignment="Center" Margin="0,25,0,0">
+            <TextBlock Text="THE MOLE GAME" Grid.Row="0" x:Name="tbTitle"
+                        Foreground="#00ADB5" FontSize="42" FontWeight="Bold" 
+                        HorizontalAlignment="Center" Margin="0,25,0,0">
                 <TextBlock.Effect>
                     <DropShadowEffect Color="#00ADB5" BlurRadius="10" ShadowDepth="0" Opacity="0.4"/>
                 </TextBlock.Effect>
             </TextBlock>
+
 
             <!-- ========================================================= -->
             <!-- 1. PANELA: BOTOI NAGUSIAK -->
@@ -161,7 +163,7 @@
             <StackPanel x:Name="pnlModeratorRooms" Grid.Row="1" VerticalAlignment="Center" Visibility="Collapsed">
                 <TextBlock Text="PARTIDA AKTIBOAK:" Foreground="White" FontSize="14" FontWeight="Bold" Margin="0,0,0,5"/>
 
-                <ListBox x:Name="lstRooms" Height="130" 
+                <ListBox x:Name="lstRooms" Height="180" 
                          Background="Transparent" BorderThickness="0"
                          Foreground="White" Margin="0,0,0,20"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
@@ -225,6 +227,14 @@
                 </ListBox>
 
                 <Button Content="SARTU HAUTATUTAKOAN" Click="BtnJoinSelected_Click" Height="45" Background="#00ADB5" Foreground="White" FontWeight="Bold" Margin="0,0,0,10">
+                    <Button.Resources>
+                        <Style TargetType="Border">
+                            <Setter Property="CornerRadius" Value="5"/>
+                        </Style>
+                    </Button.Resources>
+                </Button>
+
+                <Button Content="➕ SORTU TEST PARTIDA" Click="BtnCreateTestGame_Click" Height="45" Background="#FF6B35" Foreground="White" FontWeight="Bold" Margin="0,0,0,10">
                     <Button.Resources>
                         <Style TargetType="Border">
                             <Setter Property="CornerRadius" Value="5"/>
