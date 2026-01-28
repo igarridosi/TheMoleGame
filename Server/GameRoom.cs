@@ -225,6 +225,20 @@ namespace Server
                     _dbManager.SetUserBanStatus(banTarget.Username, banTarget.IsBanned);
                     break;
 
+                case PacketType.DeleteUserRequest:
+                    string usernameToDelete = packet.Message;
+                    bool deleted = _dbManager.DeleteUser(usernameToDelete);
+                    
+                    if (_clients.TryGetValue(clientId, out StreamWriter delWriter))
+                    {
+                        delWriter.WriteLine(PacketSerializer.Serialize(new Packet 
+                        { 
+                            Type = PacketType.DeleteUserResponse, 
+                            Message = deleted ? "OK" : "ERROR" 
+                        }));
+                    }
+                    break;
+
                 case PacketType.UpdateUserRoleRequest:
                     var roleReq = PacketSerializer.DeserializeData<UpdateRoleRequest>(packet.Message);
                     _dbManager.UpdateUserRole(roleReq.Username, roleReq.NewRole);

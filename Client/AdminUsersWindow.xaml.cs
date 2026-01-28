@@ -22,7 +22,7 @@ namespace Client
         private string _myUsername; // Nire izena gordetzeko
 
         // DROPDOWN AUKERAK (XAML-tik irakurtzeko "public" eta "property" izan behar du)
-        public List<string> AvailableRoles { get; set; } = new List<string> { "Player", "Admin" };
+        public List<string> AvailableRoles { get; set; } = new List<string> { "Player", "Moderator" };
 
         // Constructor-a eguneratu: Nire izena ere pasatu behar dugu konparatzeko
         public AdminUsersWindow(ServerConnection server, string myUsername)
@@ -84,6 +84,51 @@ namespace Client
 
             string status = user.IsBanned ? "BLOKEATUA (Banned)" : "DESBLOKEATUA (Active)";
             MessageBox.Show($"Erabiltzailea eguneratuta: {user.Username}\nEgoera berria: {status}");
+        }
+
+        private async void BtnDeleteUser_Click(object sender, RoutedEventArgs e)
+        {
+            // 1. Lortu erabiltzailea
+            var user = ((FrameworkElement)sender).DataContext as User;
+            if (user == null) return;
+
+            // 2. SEGURTASUNA: Norbere burua edo Moderatzaile nagusia ez ezabatu
+            if (user.Username == _myUsername)
+            {
+                MessageBox.Show("Ezin duzu zeure burua ezabatu!", "Errorea", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            if (user.Username == "moderator")
+            {
+                MessageBox.Show("Ezin duzu Moderatzaile nagusia ezabatu.", "Debekatua", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            // 3. BERRESPENA ESKATU
+            var result = MessageBox.Show(
+                $"Ziur zaude '{user.Username}' erabiltzailea BETIKO ezabatu nahi duzula?\n\n" +
+                $"⚠️ ABISUA: Ekintza hau EZIN DA DESEGIN.\n" +
+                $"Erabiltzailearen datu guztiak (estatistikak, historikoa...) ezabatuko dira.",
+                "Erabiltzailea Ezabatu",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+
+            if (result != MessageBoxResult.Yes) return;
+
+            // 4. BIDALI ESKABIDEA ZERBITZARIARI
+            var packet = new Packet
+            {
+                Type = PacketType.DeleteUserRequest,
+                Message = user.Username
+            };
+            await _server.SendPacketAsync(packet);
+
+            // 5. ITXARON ERANTZUNAREN (Timeout: 3 segundu)
+            await Task.Delay(500); // Zerbitzariak prozesatu dezala itxaron pixka bat
+
+            // 6. FRESKATU ZERRENDA
+            MessageBox.Show($"Erabiltzailea ezabatu da: {user.Username}", "Arrakasta", MessageBoxButton.OK, MessageBoxImage.Information);
+            LoadUsers();
         }
 
         private void BtnCreateUser_Click(object sender, RoutedEventArgs e)

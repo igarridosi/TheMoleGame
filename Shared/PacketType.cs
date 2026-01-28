@@ -49,6 +49,8 @@ namespace Shared
         GetUserListRequest, // Admin -> Server
         GetUserListResponse, // Server -> Admin
         BanUserRequest,      // Admin -> Server (Ban/Unban)
+        DeleteUserRequest,   // Admin -> Server (Ezabatu erabiltzailea)
+        DeleteUserResponse,  // Server -> Admin (Konfirmazioa)
         KickUser,     // Admin -> Server (Bota hau)
         YouAreKicked, // Server -> Client (Bota zaituzte)
 

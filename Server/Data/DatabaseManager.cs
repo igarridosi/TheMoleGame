@@ -591,5 +591,60 @@ namespace Server.Data
             }
             catch { return false; }
         }
+
+        public bool DeleteUser(string username)
+        {
+            try
+            {
+                using (var conn = GetConnection())
+                {
+                    conn.Open();
+
+                    // Segurtasun egiaztapena: Ez ezabatu 'moderator' edo 'admin'
+                    if (username.ToLower() == "moderator" || username.ToLower() == "admin")
+                    {
+                        Console.WriteLine($"[DB] ERROREA: Ezin da ezabatu erabiltzaile sistema: {username}");
+                        return false;
+                    }
+
+                    // 1. Lortu erabiltzailearen ID-a
+                    int userId = GetUserIdByName(username);
+                    if (userId == 0)
+                    {
+                        Console.WriteLine($"[DB] Ez da aurkitu erabiltzailea: {username}");
+                        return false;
+                    }
+
+                    // 2. EZABATU ESTATISTIKAK (Stats taula)
+                    string deleteStat = "DELETE FROM Stats WHERE UserId = @id";
+                    using (var cmd = new SQLiteCommand(deleteStat, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@id", userId);
+                        cmd.ExecuteNonQuery();
+                    }
+
+                    // 3. EZABATU ERABILTZAILEA (Users taula)
+                    string deleteUser = "DELETE FROM Users WHERE Id = @id";
+                    using (var cmd = new SQLiteCommand(deleteUser, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@id", userId);
+                        int rows = cmd.ExecuteNonQuery();
+                        
+                        if (rows > 0)
+                        {
+                            Console.WriteLine($"[DB] Erabiltzailea ezabatu da: {username} (ID: {userId})");
+                            return true;
+                        }
+                    }
+
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[DB ERROR] DeleteUser: {ex.Message}");
+                return false;
+            }
+        }
     }
 }

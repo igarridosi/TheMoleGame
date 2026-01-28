@@ -191,34 +191,59 @@
                 </DataGridTemplateColumn>
 
                 <!-- AKZIOAK (Lehengoa bezala) -->
-                <DataGridTemplateColumn Header="Akzioak" Width="140">
+                <DataGridTemplateColumn Header="Akzioak" Width="200">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <Button Click="BtnToggleBan_Click" 
-                                    FontWeight="Bold" FontSize="11" 
-                                    Margin="5" Padding="5,2" 
-                                    Cursor="Hand" BorderThickness="0">
-                                <Button.Style>
-                                    <Style TargetType="Button">
-                                        <Setter Property="Content" Value="UNBAN (Gaitu)"/>
-                                        <Setter Property="Background" Value="#00C853"/>
-                                        <Setter Property="Foreground" Value="White"/>
-                                        <Setter Property="Visibility" Value="Visible"/>
+                            <StackPanel Orientation="Horizontal">
+                                <!-- BAN BOTOIA -->
+                                <Button Click="BtnToggleBan_Click" 
+                                        FontWeight="Bold" FontSize="11" 
+                                        Margin="35,0,5,0" Padding="10,2" 
+                                        Cursor="Hand" BorderThickness="0">
+                                    <Button.Style>
+                                        <Style TargetType="Button">
+                                            <Setter Property="Content" Value="UNBAN"/>
+                                            <Setter Property="Background" Value="#00C853"/>
+                                            <Setter Property="Foreground" Value="White"/>
+                                            <Setter Property="Visibility" Value="Visible"/>
 
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsBanned}" Value="False">
-                                                <Setter Property="Content" Value="BAN (Blokeatu)"/>
-                                                <Setter Property="Background" Value="#FF4444"/>
-                                            </DataTrigger>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsBanned}" Value="False">
+                                                    <Setter Property="Content" Value="BAN"/>
+                                                    <Setter Property="Background" Value="#ff8244"/>
+                                                </DataTrigger>
 
-                                            <!-- Moderatzailea bada, botoia ezkutatu -->
-                                            <DataTrigger Binding="{Binding Role}" Value="Moderator">
-                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Button.Style>
-                            </Button>
+                                                <!-- Moderatzailea bada, botoia ezkutatu -->
+                                                <DataTrigger Binding="{Binding Role}" Value="Moderator">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+                                <Separator Width="20" Background="Transparent"/>
+
+                                <!-- EZABATU BOTOIA (BERRIA) -->
+                                <Button Click="BtnDeleteUser_Click" 
+                                        Content="🗑️ EZABATU"
+                                        FontWeight="Bold" FontSize="11" 
+                                        Margin="0" Padding="5,2" 
+                                        Cursor="Hand" BorderThickness="0"
+                                        Background="#FF4444" 
+                                        Foreground="White">
+                                    <Button.Style>
+                                        <Style TargetType="Button">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                            <!-- Moderatzailea edo erabiltzaile bera bada, ezkutatu -->
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Role}" Value="Moderator">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+                            </StackPanel>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
