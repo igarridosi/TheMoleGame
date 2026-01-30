@@ -1,5 +1,6 @@
 ﻿using Server;
 using Server.Data;
+using Server.Services;
 using Shared;
 using System.Collections.Concurrent;
 using System.Net;
@@ -52,6 +53,8 @@ class Program
 
     private static ConcurrentDictionary<int, string> _tempClientNames = new ConcurrentDictionary<int, string>();
 
+    private static IAuthService _authService;
+
     static void Main(string[] args)
     {
         SQLitePCL.Batteries.Init();
@@ -61,6 +64,9 @@ class Program
         // 1. Datu-basea hasieratu
         _dbManager = new DatabaseManager();
         Console.WriteLine("[DB] Datu-basea prest.");
+
+        // DEPENDENTZIA INJEKZIOA (Eskuz)
+        _authService = new AuthService(_dbManager);
 
         // 2. Zerbitzaria martxan jarri
         StartServer(8080); // 8080 portuan entzungo du
@@ -166,7 +172,9 @@ class Program
                         // --- KONTUAK ---
                         case PacketType.LoginRequest:
                             var loginReq = PacketSerializer.DeserializeData<LoginRequest>(packet.Message);
-                            User user = _dbManager.ValidateUser(loginReq.Username, loginReq.Password);
+                            // User user = _dbManager.ValidateUser(loginReq.Username, loginReq.Password);
+                            // ALDAKETA: Orain _authService erabiltzen dugu
+                            User user = _authService.ValidateUser(loginReq.Username, loginReq.Password);
 
                             if (user != null)
                             {
