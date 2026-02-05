@@ -24,22 +24,6 @@ namespace TestsProject
         // Helper: DB Managerra sortu test fitxategiarekin
         private DatabaseManager CreateTestDatabase()
         {
-            // Zure DatabaseManager klaseak fitxategi izena aldatzeko aukera eman behar du
-            // Edo bestela, "Connection String" pasatu behar zaio.
-            // DEMAGUN: Zure DatabaseManager-ek fitxategi izena parametro gisa onartzen duela 
-            // edo "ConnectionString" publikoa dela.
-
-            // Konponbide azkarra: DatabaseManager moldatu beharko genuke izena onartzeko.
-            // Baina errazago egiteko, test honetarako klase heredatu bat egingo dugu 
-            // edo zuzenean DatabaseManager.DbFileName aldatuko dugu (publikoa bada).
-
-            // SUPOSIZIOA: DatabaseManager moldatu dugu parametroa onartzeko.
-            // return new DatabaseManager(TestDbName);
-
-            // EZIN BADUZU MOLDATU:
-            // Trikimailua: Fitxategi originala ("TheMoleGame.db") erabiliko du, 
-            // beraz, kontuz ibili behar dugu ezabatzeko.
-
             var db = new DatabaseManager();
             // (Hemen zure kodeak "TheMoleGame.db" sortuko du automatikoki)
             return db;

@@ -537,13 +537,13 @@ namespace Server
 
             if (survivors < 3)
             {
-                EndGame("INPOSTOREAK IRABAZI");
+                EndGame($"INPOSTOREAK IRABAZI ({impostorName})");
                 return;
             }
 
             if (_roundCount >= _maxRounds)
             {
-                EndGame("INPOSTOREAK IRABAZI (Rondak amaitu dira)");
+                EndGame($"INPOSTOREAK IRABAZI ({impostorName}) (Rondak amaitu dira)");
             }
             else
             {
