@@ -27,8 +27,11 @@ class Program
     private static ConcurrentDictionary<string, int> _votes = new ConcurrentDictionary<string, int>(); // Nor -> Zenbat boto
     private static int _playersVotedCount = 0;  // Zenbatek bozkatu dute?
     private static bool _isVotingPhase = false; // Fasea kontrolatzeko
-    private static int _impostorId = -1;        // Inpostorea nor den jakiteko (StartGameLogic-en beteko dugu)
+    private static int _impostorId = -1;        // Inpostorea nor den denbora agortzen bada
     private static HashSet<int> _playersWhoVoted = new HashSet<int>(); // Nork bozkatu du ronda honetan? (Boto bikoitzak ekiditeko)
+    
+    // ALDAGAI BERRIA: Bozketa "erreal" kopurua (ez berdinketa errepikatuak)
+    private static int _votingRoundsCompleted = 0;
 
     private static List<int> _eliminatedPlayers = new List<int>();
 
@@ -259,10 +262,16 @@ class Program
                         case PacketType.GetRankingRequest:
                             var ranking = _dbManager.GetGlobalRanking();
                             var gStats = _dbManager.GetGlobalStats();
+                            var detailedStats = _dbManager.GetAllDetailedStats(); // BERRIA
                             writer.WriteLine(PacketSerializer.Serialize(new Packet
                             {
                                 Type = PacketType.GetRankingResponse,
-                                Message = PacketSerializer.SerializeData(new RankingPayload { List = ranking, Stats = gStats })
+                                Message = PacketSerializer.SerializeData(new RankingPayload 
+                                { 
+                                    List = ranking, 
+                                    Stats = gStats,
+                                    DetailedStats = detailedStats
+                                })
                             }));
                             break;
 
@@ -453,6 +462,7 @@ class Program
         _votes.Clear();
         _eliminatedPlayers.Clear();
         _playersWhoVoted.Clear(); // Hau ere garbitu
+        _votingRoundsCompleted = 0; // BERRIA: Garbitu hasieran
 
         // 2. JOKALARIAK IRAGAZI (Moderatzaileak kendu joko-listatik)
         // 'playingClients' dira bakarrik jolastuko dutenak (Botatu beharrekoak)
@@ -674,8 +684,8 @@ class Program
                     string name = _clientNames.ContainsKey(id) ? _clientNames[id] : "Ezezaguna";
                     Console.WriteLine($"[AFK] {name} kanporatua bozkatu ez duelako.");
 
-                    Packet msg = new Packet { Type = PacketType.ChatMessage, Message = $"[SISTEMA] {name} kanporatua izan da denboraz kanpo bozkatzeagatik." };
-                    BroadcastPacket(msg);
+                    Packet afkMsg = new Packet { Type = PacketType.ChatMessage, Message = $"[SISTEMA] {name} kanporatua izan da denboraz kanpo bozkatzeagatik." };
+                    BroadcastPacket(afkMsg);
                 }
             }
 
@@ -701,6 +711,9 @@ class Program
     {
         _isVotingPhase = false;
         Console.WriteLine("[GAME] Botoak zenbatzen...");
+
+        // KONTADOREA IGO: Bozketa bat egin da (berdinketa edo ez)
+        _votingRoundsCompleted++;
 
         // 1. Bilatu boto gehien dituena
         string mostVotedUser = null;
@@ -841,23 +854,25 @@ class Program
             // Moderatzaileak ez du estatistikarik
             if (_clientRoles.ContainsKey(clientId) && _clientRoles[clientId] == "Moderator") continue;
 
-            // 2. IDa lortu DBtik
-            int dbId = _dbManager.GetUserIdByName(username);
+            // 2. Emaitza kalkulatu
+            bool isThisUserImpostor = (clientId == _impostorId);
+            bool isThisUserWinner = (isThisUserImpostor && impostorWon) || (!isThisUserImpostor && !impostorWon);
 
-            if (dbId > 0)
+            // 3. BIZIRAUPENA KALKULATU: _votingRoundsCompleted erabili, ez _roundCount
+            // Irabazi badu: Bozketa guztiak. Galdu badu: -1.
+            int votesCast = 0;
+            int correctVotes = 0;
+            bool wasEjectedAsCivilian = _eliminatedPlayers.Contains(clientId) && !isThisUserImpostor;
+            int impostorRounds = 0;
+            
+            if (isThisUserImpostor)
             {
-                // 3. Emaitza kalkulatu
-                bool isThisUserImpostor = (clientId == _impostorId);
-                bool isThisUserWinner = (isThisUserImpostor && impostorWon) || (!isThisUserImpostor && !impostorWon);
+                impostorRounds = impostorWon ? _votingRoundsCompleted : Math.Max(0, _votingRoundsCompleted - 1);
+            }
 
-                // 4. Gorde
-                _dbManager.UpdateStats(dbId, isThisUserImpostor, isThisUserWinner);
-                Console.WriteLine($"[STATS] {username} eguneratuta. (Winner: {isThisUserWinner})");
-            }
-            else
-            {
-                Console.WriteLine($"[STATS ERROR] Ez da IDrik aurkitu {username}-rentzat.");
-            }
+            // 4. Gorde - ORAIN PARAMETRO ZUZENAREKIN
+            _dbManager.UpdateDetailedStats(username, isThisUserImpostor, isThisUserWinner, votesCast, correctVotes, wasEjectedAsCivilian, impostorRounds);
+            Console.WriteLine($"[STATS] {username} eguneratuta. (Winner: {isThisUserWinner})");
         }
         // Reset logika...
     }

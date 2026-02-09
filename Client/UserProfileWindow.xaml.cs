@@ -1,17 +1,6 @@
 ﻿using Shared;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Shapes;
 
 namespace Client
 {
@@ -23,15 +12,28 @@ namespace Client
             InitializeComponent();
             lblUsername.Text = username;
 
+            // Goiko Txartelak
             txtGames.Text = stats.GamesPlayed.ToString();
             txtWins.Text = stats.GamesWon.ToString();
 
-            // Ehunekoak kalkulatu
             double winRate = stats.GamesPlayed > 0 ? (double)stats.GamesWon / stats.GamesPlayed * 100 : 0;
             txtWinRate.Text = $"Win Rate: {winRate:F1}%";
 
             txtImpGames.Text = stats.ImpostorCount.ToString();
             txtImpWins.Text = $"Irabaziak: {stats.ImpostorWins}";
+
+            // --- ANALITIKA (Datuak TextBlock-etan betetzen) ---
+
+            // 1. Detektibe Sen (0-100%)
+            double accuracy = stats.TotalVotesCast > 0 ? (double)stats.CorrectVotes / stats.TotalVotesCast * 100 : 0;
+            txtDetective.Text = $"{accuracy:F0}%";
+
+            // 2. Martiria (Zenbakia zuzena)
+            txtMartyr.Text = stats.TimesEjectedAsCivilian.ToString();
+
+            // 3. Kamuflajea (0-3 Rondak batez beste)
+            double avgSurvival = stats.ImpostorCount > 0 ? (double)stats.ImpostorRoundsSurvived / stats.ImpostorCount : 0;
+            txtCamo.Text = $"{avgSurvival:F1}";
         }
     }
 }

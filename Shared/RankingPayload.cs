@@ -11,5 +11,8 @@ namespace Shared
     {
         public List<RankingEntry> List { get; set; }
         public GlobalStats Stats { get; set; }
+        
+        // BERRIA: Estatistika zehatzak (Metrika Aurreratuetarako)
+        public List<UserStatsWithName> DetailedStats { get; set; }
     }
 }

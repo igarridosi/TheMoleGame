@@ -6,58 +6,138 @@
         xmlns:local="clr-namespace:Client"
         mc:Ignorable="d"
         Title="Nire Estatistikak" Height="450" Width="700" Background="#1E1E1E">
-    <Grid Margin="20">
+    <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="200"/>
+            <ColumnDefinition Width="250"/>
+            <!-- Ezkerra: Profila -->
             <ColumnDefinition Width="*"/>
+            <!-- Eskuma: Datuak -->
         </Grid.ColumnDefinitions>
 
-        <!-- EZKERRA: PERFILA -->
-        <StackPanel Grid.Column="0" VerticalAlignment="Center">
-            <Border Width="100" Height="100" CornerRadius="50" Background="#333333" BorderBrush="#00ADB5" BorderThickness="2" Margin="0,0,0,15">
-                <TextBlock Text="👤" FontSize="60" HorizontalAlignment="Left" VerticalAlignment="Center" Foreground="White" Margin="9,0,0,7"/>
-            </Border>
-            <TextBlock x:Name="lblUsername" Text="Erabiltzailea" FontSize="20" FontWeight="Bold" Foreground="#00ADB5" HorizontalAlignment="Center"/>
-            <TextBlock Text="JOKALARIA" Foreground="Gray" HorizontalAlignment="Center"/>
-        </StackPanel>
+        <!-- ========================================================= -->
+        <!-- EZKERRA: PROFILA ETA ROLE -->
+        <!-- ========================================================= -->
+        <Border Grid.Column="0" Background="#252526" BorderBrush="#333" BorderThickness="0,0,1,0">
+            <StackPanel VerticalAlignment="Center">
 
-        <!-- ESKUMA: ESTATISTIKAK -->
-        <Grid Grid.Column="1" Margin="30,0,0,0">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
+                <!-- Avatar Zirkulua -->
+                <Border Width="100" Height="100" CornerRadius="50" Background="#333333" BorderBrush="#00ADB5" BorderThickness="2" Margin="0,0,0,15">
+                    <TextBlock Text="👤" FontSize="60" HorizontalAlignment="Left" VerticalAlignment="Center" Foreground="White" Margin="9,0,0,7"/>
+                </Border>
+                <TextBlock x:Name="lblUsername" Text="Erabiltzailea" FontSize="20" FontWeight="Bold" Foreground="#00ADB5" HorizontalAlignment="Center"/>
+                <TextBlock Text="JOKALARIA" Foreground="Gray" HorizontalAlignment="Center"/>
 
-            <TextBlock Text="JOKOAREN HISTORIALA" Foreground="White" FontSize="22" FontWeight="Light" Margin="0,0,0,20"/>
+            </StackPanel>
+        </Border>
 
-            <WrapPanel Grid.Row="1">
-                <!-- TXARTELA 1: PARTIDAK -->
-                <Border Width="180" Height="110" Background="#2D2D2D" CornerRadius="10" Margin="0,0,15,15" Padding="15">
-                    <StackPanel>
-                        <TextBlock Text="PARTIDAK" Foreground="Gray" FontSize="12"/>
-                        <TextBlock x:Name="txtGames" Text="0" Foreground="White" FontSize="36" FontWeight="Bold"/>
-                        <TextBlock Text="Jokatuta" Foreground="#555555" FontSize="10"/>
-                    </StackPanel>
+        <!-- ========================================================= -->
+        <!-- ESKUMA: DATUAK ETA METRIKAK -->
+        <!-- ========================================================= -->
+        <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="30">
+
+                <!-- 1. ATALA: HISTORIAL OROKORRA -->
+                <TextBlock Text="JOKOAREN HISTORIALA" Foreground="White" FontSize="18" FontWeight="Bold" Margin="0,0,0,15" Opacity="0.8"/>
+
+                <Grid Margin="0,0,0,40">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- PARTIDAK -->
+                    <Border Grid.Column="0" Background="#2D2D2D" CornerRadius="8" Padding="20" Margin="0,0,10,0">
+                        <StackPanel>
+                            <TextBlock Text="PARTIDAK" Foreground="Gray" FontSize="11" FontWeight="Bold"/>
+                            <TextBlock x:Name="txtGames" Text="0" Foreground="White" FontSize="40" FontWeight="Black" Margin="0,10,0,0"/>
+                            <TextBlock Text="Guztira" Foreground="#555" FontSize="11"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- GARAIPENAK -->
+                    <Border Grid.Column="1" Background="#2D2D2D" CornerRadius="8" Padding="20" Margin="5,0,5,0">
+                        <StackPanel>
+                            <TextBlock Text="GARAIPENAK" Foreground="#00ADB5" FontSize="11" FontWeight="Bold"/>
+                            <TextBlock x:Name="txtWins" Text="0" Foreground="#00ADB5" FontSize="40" FontWeight="Black" Margin="0,10,0,0"/>
+                            <TextBlock x:Name="txtWinRate" Text="Win Rate: 0%" Foreground="#555" FontSize="11"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- INPOSTORE DATUAK -->
+                    <Border Grid.Column="2" Background="#2D2D2D" CornerRadius="8" Padding="20" Margin="10,0,0,0">
+                        <StackPanel>
+                            <TextBlock Text="INPOSTOREA" Foreground="#FF5555" FontSize="11" FontWeight="Bold"/>
+                            <TextBlock x:Name="txtImpGames" Text="0" Foreground="#FF5555" FontSize="40" FontWeight="Black" Margin="0,10,0,0"/>
+                            <TextBlock x:Name="txtImpWins" Text="Irabaziak: 0" Foreground="#885555" FontSize="11"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <!-- 2. ATALA: ANALITIKA AURRERATUA (Diseinu berria) -->
+                <TextBlock Text="JOKALARIAREN ESTILOA" Foreground="White" FontSize="18" FontWeight="Bold" Margin="0,0,0,15" Opacity="0.8"/>
+
+                <!-- DETEKTIBE SEN -->
+                <Border Background="#252526" CornerRadius="8" Padding="15" Margin="0,0,0,15" BorderBrush="#333" BorderThickness="1">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="50"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Text="🕵️" FontSize="24" VerticalAlignment="Center"/>
+
+                        <StackPanel Grid.Column="1" Margin="15,0">
+                            <TextBlock Text="DETEKTIBE SEN" Foreground="#00ADB5" FontWeight="Bold" FontSize="12"/>
+                            <TextBlock Text="Inpostorea asmatzeko gaitasuna bozketan." Foreground="Gray" FontSize="10" Margin="0,2,0,5"/>
+                        </StackPanel>
+
+                        <TextBlock x:Name="txtDetective" Grid.Column="2" Text="0%" Foreground="White" FontSize="20" FontWeight="Bold" VerticalAlignment="Center"/>
+                    </Grid>
                 </Border>
 
-                <!-- TXARTELA 2: GARAIPENAK -->
-                <Border Width="180" Height="110" Background="#2D2D2D" CornerRadius="10" Margin="0,0,15,15" Padding="15">
-                    <StackPanel>
-                        <TextBlock Text="GARAIPENAK" Foreground="#00ADB5" FontSize="12"/>
-                        <TextBlock x:Name="txtWins" Text="0" Foreground="#00ADB5" FontSize="36" FontWeight="Bold"/>
-                        <TextBlock x:Name="txtWinRate" Text="Win Rate: 0%" Foreground="#555555" FontSize="10"/>
-                    </StackPanel>
+                <!-- MARTIRIA -->
+                <Border Background="#252526" CornerRadius="8" Padding="15" Margin="0,0,0,15" BorderBrush="#333" BorderThickness="1">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="50"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Text="💀" FontSize="24" VerticalAlignment="Center"/>
+
+                        <StackPanel Grid.Column="1" Margin="15,0">
+                            <TextBlock Text="MARTIRIA" Foreground="#FF5555" FontWeight="Bold" FontSize="12"/>
+                            <TextBlock Text="Inozentea izanik kanporatua izan zaren aldia." Foreground="Gray" FontSize="10" Margin="0,2,0,5"/>
+                        </StackPanel>
+
+                        <TextBlock x:Name="txtMartyr" Grid.Column="2" Text="0" Foreground="White" FontSize="20" FontWeight="Bold" VerticalAlignment="Center"/>
+                    </Grid>
                 </Border>
 
-                <!-- TXARTELA 3: INPOSTORE -->
-                <Border Width="180" Height="110" Background="#2D2D2D" CornerRadius="10" Margin="0,0,15,15" Padding="15">
-                    <StackPanel>
-                        <TextBlock Text="INPOSTORE" Foreground="#FF5555" FontSize="12"/>
-                        <TextBlock x:Name="txtImpGames" Text="0" Foreground="#FF5555" FontSize="36" FontWeight="Bold"/>
-                        <TextBlock x:Name="txtImpWins" Text="Irabaziak: 0" Foreground="#885555" FontSize="10"/>
-                    </StackPanel>
+                <!-- KAMUFLAJEA -->
+                <Border Background="#252526" CornerRadius="8" Padding="15" BorderBrush="#333" BorderThickness="1">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="50"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Text="🥷" FontSize="24" VerticalAlignment="Center"/>
+
+                        <StackPanel Grid.Column="1" Margin="15,0">
+                            <TextBlock Text="KAMUFLAJEA" Foreground="#FFD700" FontWeight="Bold" FontSize="12"/>
+                            <TextBlock Text="Inpostore bezala biziraupen luzeena (Rondak)." Foreground="Gray" FontSize="10" Margin="0,2,0,5"/>
+                        </StackPanel>
+
+                        <TextBlock x:Name="txtCamo" Grid.Column="2" Text="0.0" Foreground="White" FontSize="20" FontWeight="Bold" VerticalAlignment="Center"/>
+                    </Grid>
                 </Border>
-            </WrapPanel>
-        </Grid>
+
+            </StackPanel>
+        </ScrollViewer>
     </Grid>
 </Window>

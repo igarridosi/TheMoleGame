@@ -4,30 +4,34 @@ using Shared;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Shapes;
-using System.Collections.Generic;
 using System.IO;
 using QuestPDF.Helpers;
+using IOPath = System.IO.Path; // ALIAS gehitu
 
 namespace Client
 {
+    // UI-rako klase laguntzailea (Metrikak erakusteko)
+    public class PlayerMetricDisplay
+    {
+        public string Username { get; set; }
+        public string DetectiveScore { get; set; }  // Detektibe Sen (%)
+        public string MartyrScore { get; set; }     // Martiria (%)
+        public string CamouflageScore { get; set; } // Kamuflajea (Rondak)
+        public string Profile { get; set; }         // Jokalari profila
+    }
+
     public partial class RankingWindow : Window
     {
         private RankingPayload _data;
+        private List<UserStatsWithName> _detailedStats; // Estatistika zehatzak
 
         public RankingWindow(RankingPayload payload, bool isModerator)
         {
             InitializeComponent();
             _data = payload;
+            _detailedStats = payload.DetailedStats; // Zuzenean payload-etik lortu
 
             QuestPDF.Settings.License = LicenseType.Community;
 
@@ -53,7 +57,63 @@ namespace Client
                 txtBalance.Text = $"{impPercent:F0}% / {civPercent:F0}%";
             }
 
+            // 3. METRIKA AURRERATUAK BETE
+            LoadMetricsGrid();
+
             if (isModerator) btnExportPdf.Visibility = Visibility.Visible;
+        }
+
+        // METODO BERRIA: Metrika aurreratuak taula batean erakutsi
+        private void LoadMetricsGrid()
+        {
+            if (_detailedStats == null || !_detailedStats.Any())
+            {
+                gridMetrics.ItemsSource = null;
+                return;
+            }
+
+            var metricsList = new List<PlayerMetricDisplay>();
+
+            foreach (var item in _detailedStats)
+            {
+                var stats = item.Stats;
+
+                // 1. Detektibe Sen (Accuracy) - Herritarra denean, zuzen bozkatu dion inpostoreari
+                double detective = stats.TotalVotesCast > 0
+                    ? (double)stats.CorrectVotes / stats.TotalVotesCast * 100
+                    : 0;
+
+                // 2. Martiria - Herritarra denean, oker kanporatua izateko probabilitatea
+                double martyr = stats.CivilianCount > 0
+                    ? (double)stats.TimesEjectedAsCivilian / stats.CivilianCount * 100
+                    : 0;
+
+                // 3. Kamuflajea - Inpostorea denean, batez beste zenbat ronda iraun duen
+                double camouflage = stats.ImpostorCount > 0
+                    ? (double)stats.ImpostorRoundsSurvived / stats.ImpostorCount
+                    : 0;
+
+                // 4. Profila erabaki
+                string profile = GetPlayerProfile(detective, martyr, camouflage);
+
+                metricsList.Add(new PlayerMetricDisplay
+                {
+                    Username = item.Username,
+                    DetectiveScore = $"{detective:F0}%",
+                    MartyrScore = $"{martyr:F0}%",
+                    CamouflageScore = $"{camouflage:F1} ronda",
+                    Profile = profile
+                });
+            }
+
+            gridMetrics.ItemsSource = metricsList;
+        }
+
+        // METODO BERRIA: Estatistika zehatzak eskatu (Moderatzaileak)
+        public void LoadDetailedStats(List<UserStatsWithName> detailedStats)
+        {
+            _detailedStats = detailedStats;
+            LoadMetricsGrid(); // Taula eguneratu
         }
 
         private void BtnExportPdf_Click(object sender, RoutedEventArgs e)
@@ -68,83 +128,309 @@ namespace Client
                         page.Size(PageSizes.A4);
                         page.Margin(2, Unit.Centimetre);
                         page.PageColor(QuestPDF.Helpers.Colors.White);
-                        page.DefaultTextStyle(x => x.FontSize(12));
+                        page.DefaultTextStyle(x => x.FontSize(10).FontFamily("Arial"));
 
-                        // GOIBURUA
+                        // ====== GOIBURUA ======
                         page.Header().Row(row =>
                         {
                             row.RelativeItem().Column(col =>
                             {
-                                col.Item().Text("THE MOLE GAME").SemiBold().FontSize(20).FontColor(QuestPDF.Helpers.Colors.Blue.Medium);
-                                col.Item().Text("Jokoaren Estatistika Ofizialak").FontSize(10);
+                                col.Item().Text("🎭 THE MOLE GAME - TXOSTEN OFIZIALA")
+                                   .SemiBold().FontSize(22).FontColor(QuestPDF.Helpers.Colors.Blue.Darken2);
+                                col.Item().PaddingTop(5).Text("Estatistika Profesionalak eta Analisi Sakona")
+                                   .FontSize(11).FontColor(QuestPDF.Helpers.Colors.Grey.Darken1);
                             });
-                            row.ConstantItem(100).Text(System.DateTime.Now.ToString("yyyy-MM-dd"));
+                            row.ConstantItem(120).AlignRight().Column(col =>
+                            {
+                                col.Item().Text($"📅 {DateTime.Now:yyyy-MM-dd}").FontSize(10);
+                                col.Item().Text($"🕐 {DateTime.Now:HH:mm}").FontSize(9).FontColor(QuestPDF.Helpers.Colors.Grey.Medium);
+                            });
                         });
 
-                        // GORPUTZA (Taula)
-                        page.Content().PaddingVertical(1, Unit.Centimetre).Table(table =>
+                        // ====== GORPUTZA ======
+                        page.Content().PaddingVertical(1, Unit.Centimetre).Column(col =>
                         {
-                            // Zutabeak definitu
-                            table.ColumnsDefinition(columns =>
-                            {
-                                columns.RelativeColumn();
-                                columns.ConstantColumn(60);
-                                columns.ConstantColumn(60);
-                                columns.ConstantColumn(80);
-                                columns.ConstantColumn(60);
-                            });
+                            // 1️⃣ ESTATISTIKA GLOBALAK (Laburmena)
+                            col.Item().PaddingBottom(15).Element(ComposeGlobalStats);
 
-                            // Goiburuak
-                            table.Header(header =>
-                            {
-                                header.Cell().Element(CellStyle).Text("Jokalaria");
-                                header.Cell().Element(CellStyle).Text("Jokatuta");
-                                header.Cell().Element(CellStyle).Text("Irabazita");
-                                header.Cell().Element(CellStyle).Text("Inp. Irabazi");
-                                header.Cell().Element(CellStyle).Text("%");
-                            });
+                            // 2️⃣ RANKING OROKORRA (Top 10)
+                            col.Item().PaddingBottom(20).Element(ComposeRankingTable);
 
-                            // Datuak
-                            foreach (var item in _data.List)
+                            // 3️⃣ METRIKA AURRERATUAK (Bakarrik estatistika zehatzak badaude)
+                            if (_detailedStats != null && _detailedStats.Any())
                             {
-                                table.Cell().Element(CellStyle).Text(item.Username);
-                                table.Cell().Element(CellStyle).Text(item.GamesPlayed.ToString());
-                                table.Cell().Element(CellStyle).Text(item.TotalWins.ToString());
-                                table.Cell().Element(CellStyle).Text(item.ImpostorWins.ToString());
-                                table.Cell().Element(CellStyle).Text(item.WinRate);
+                                col.Item().PageBreak(); // Orrialde berria
+                                col.Item().PaddingBottom(15).Element(ComposeAdvancedMetrics);
                             }
+
+                            // 4️⃣ KONKLUSIOAK ETA GOMENDIOAK
+                            col.Item().PageBreak();
+                            col.Item().Element(ComposeConclusions);
                         });
 
-                        // OINA
+                        // ====== OINA ======
                         page.Footer()
                             .AlignCenter()
                             .Text(x =>
                             {
                                 x.Span("Orrialdea ");
                                 x.CurrentPageNumber();
+                                x.Span(" / ");
+                                x.TotalPages();
                             });
                     });
                 });
 
                 // Gorde
-                string path = System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.Desktop), "TheMole_Report.pdf");
+                string path = IOPath.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), 
+                    $"TheMole_Report_{DateTime.Now:yyyyMMdd_HHmmss}.pdf");
                 document.GeneratePdf(path);
 
-                MessageBox.Show($"PDFa sortu da mahaigainean:\n{path}", "Esportatuta", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show($"✅ PDFa sortu da mahaigainean:\n{path}", "Esportatuta", MessageBoxButton.OK, MessageBoxImage.Information);
 
-                // Automatikoki ireki (aukerakoa)
-                new System.Diagnostics.Process { StartInfo = new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true } }.Start();
+                // Automatikoki ireki
+                new System.Diagnostics.Process 
+                { 
+                    StartInfo = new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true } 
+                }.Start();
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
-                MessageBox.Show("Errorea PDFa sortzean: " + ex.Message);
+                MessageBox.Show($"❌ Errorea PDFa sortzean:\n{ex.Message}", "Errorea", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
-        // Estilo laguntzailea
-        static IContainer CellStyle(IContainer container)
+        // ========== PDF ATALAK ==========
+
+        void ComposeGlobalStats(IContainer container)
         {
-            return container.BorderBottom(1).BorderColor(QuestPDF.Helpers.Colors.Grey.Lighten2).PaddingVertical(5);
+            container.Column(col =>
+            {
+                col.Item().Text("📊 ESTATISTIKA GLOBALAK").SemiBold().FontSize(16).FontColor(QuestPDF.Helpers.Colors.Blue.Medium);
+                col.Item().PaddingTop(10).Row(row =>
+                {
+                    // Txartel 1: Partidak
+                    row.RelativeItem().Border(1).BorderColor(QuestPDF.Helpers.Colors.Grey.Lighten2)
+                       .Background(QuestPDF.Helpers.Colors.Blue.Lighten4).Padding(10).Column(c =>
+                    {
+                        c.Item().Text("🎮 Partida Guztira").SemiBold().FontSize(11);
+                        c.Item().Text(_data.Stats.TotalMatches.ToString()).FontSize(24).FontColor(QuestPDF.Helpers.Colors.Blue.Darken2);
+                    });
+
+                    row.ConstantItem(10); // Tartea
+
+                    // Txartel 2: Top Inpostorea
+                    row.RelativeItem().Border(1).BorderColor(QuestPDF.Helpers.Colors.Grey.Lighten2)
+                       .Background(QuestPDF.Helpers.Colors.Red.Lighten4).Padding(10).Column(c =>
+                    {
+                        c.Item().Text("🥷 Top Inpostorea").SemiBold().FontSize(11);
+                        c.Item().Text(_data.Stats.TopImpostor).FontSize(16).FontColor(QuestPDF.Helpers.Colors.Red.Darken2);
+                        c.Item().Text($"{_data.Stats.TopImpostorWins} Garaipen").FontSize(10);
+                    });
+
+                    row.ConstantItem(10);
+
+                    // Txartel 3: Orekaturik
+                    row.RelativeItem().Border(1).BorderColor(QuestPDF.Helpers.Colors.Grey.Lighten2)
+                       .Background(QuestPDF.Helpers.Colors.Green.Lighten4).Padding(10).Column(c =>
+                    {
+                        c.Item().Text("⚖️ Orekaturik").SemiBold().FontSize(11);
+                        double imp = _data.Stats.ImpostorWinRate;
+                        double civ = 100 - imp;
+                        c.Item().Text($"Inp: {imp:F1}%").FontSize(12).FontColor(QuestPDF.Helpers.Colors.Red.Medium);
+                        c.Item().Text($"Her: {civ:F1}%").FontSize(12).FontColor(QuestPDF.Helpers.Colors.Green.Medium);
+                    });
+                });
+            });
+        }
+
+        void ComposeRankingTable(IContainer container)
+        {
+            container.Column(col =>
+            {
+                col.Item().Text("🏆 RANKING OROKORRA (Top 10)").SemiBold().FontSize(16).FontColor(QuestPDF.Helpers.Colors.Blue.Medium);
+                col.Item().PaddingTop(10).Table(table =>
+                {
+                    table.ColumnsDefinition(columns =>
+                    {
+                        columns.ConstantColumn(40);  // #
+                        columns.RelativeColumn(2);   // Jokalaria
+                        columns.ConstantColumn(70);  // Jokatuta
+                        columns.ConstantColumn(70);  // Irabazita
+                        columns.ConstantColumn(70);  // Inp. Wins
+                        columns.ConstantColumn(60);  // #
+                    });
+
+                    // Goiburuak
+                    table.Header(header =>
+                    {
+                        header.Cell().Element(HeaderStyle).Text("#");
+                        header.Cell().Element(HeaderStyle).Text("Jokalaria");
+                        header.Cell().Element(HeaderStyle).Text("Jokatuta");
+                        header.Cell().Element(HeaderStyle).Text("Irabazita");
+                        header.Cell().Element(HeaderStyle).Text("Inp. Wins");
+                        header.Cell().Element(HeaderStyle).Text("Win %");
+                    });
+
+                    // Datuak (Top 10)
+                    int rank = 1;
+                    foreach (var item in _data.List.Take(10))
+                    {
+                        var bgColor = rank <= 3 ? QuestPDF.Helpers.Colors.Yellow.Lighten3 : QuestPDF.Helpers.Colors.White;
+                        
+                        table.Cell().Element(c => CellStyle(c, bgColor)).Text(rank.ToString()).SemiBold();
+                        table.Cell().Element(c => CellStyle(c, bgColor)).Text(item.Username);
+                        table.Cell().Element(c => CellStyle(c, bgColor)).Text(item.GamesPlayed.ToString());
+                        table.Cell().Element(c => CellStyle(c, bgColor)).Text(item.TotalWins.ToString());
+                        table.Cell().Element(c => CellStyle(c, bgColor)).Text(item.ImpostorWins.ToString());
+                        table.Cell().Element(c => CellStyle(c, bgColor)).Text(item.WinRate);
+                        
+                        rank++;
+                    }
+                });
+            });
+        }
+
+        void ComposeAdvancedMetrics(IContainer container)
+        {
+            container.Column(col =>
+            {
+                col.Item().Text("📈 METRIKA AURRERATUAK (Analisi Sakona)").SemiBold().FontSize(16).FontColor(QuestPDF.Helpers.Colors.Purple.Medium);
+                
+                col.Item().PaddingTop(10).Text("Metrika hauek jokalari bakoitzaren gaitasun zehatzak neurtzen dituzte:")
+                   .FontSize(9).Italic().FontColor(QuestPDF.Helpers.Colors.Grey.Darken1);
+
+                col.Item().PaddingTop(10).Table(table =>
+                {
+                    table.ColumnsDefinition(columns =>
+                    {
+                        columns.RelativeColumn(2);    // Jokalaria
+                        columns.ConstantColumn(60);   // Detektibe Sen
+                        columns.ConstantColumn(60);   // Martiria
+                        columns.ConstantColumn(70);   // Kamuflajea
+                        columns.ConstantColumn(80);   // Interpretazioa
+                    });
+
+                    // Goiburuak
+                    table.Header(header =>
+                    {
+                        header.Cell().Element(HeaderStyle).Text("Jokalaria");
+                        header.Cell().Element(HeaderStyle).Text("🕵️ Detekt.");
+                        header.Cell().Element(HeaderStyle).Text("💀 Martir.");
+                        header.Cell().Element(HeaderStyle).Text("🥷 Kamuf.");
+                        header.Cell().Element(HeaderStyle).Text("Profila");
+                    });
+
+                    // Datuak - ALDATUTA: UserStatsWithName erabili
+                    foreach (var item in _detailedStats.Take(15))
+                    {
+                        var stats = item.Stats;
+
+                        // 1. Detektibe Sen (Accuracy)
+                        double detective = stats.TotalVotesCast > 0 
+                            ? (double)stats.CorrectVotes / stats.TotalVotesCast * 100 
+                            : 0;
+
+                        // 2. Martiria (Wrongly Ejected %)
+                        double martyr = stats.CivilianCount > 0 
+                            ? (double)stats.TimesEjectedAsCivilian / stats.CivilianCount * 100 
+                            : 0;
+
+                        // 3. Kamuflajea (Avg Rounds Survived)
+                        double camouflage = stats.ImpostorCount > 0 
+                            ? (double)stats.ImpostorRoundsSurvived / stats.ImpostorCount 
+                            : 0;
+
+                        // 4. Profila erabaki
+                        string profile = GetPlayerProfile(detective, martyr, camouflage);
+
+                        table.Cell().Element(CellStyleDefault).Text(item.Username);
+                        table.Cell().Element(CellStyleDefault).Text($"{detective:F0}%");
+                        table.Cell().Element(CellStyleDefault).Text($"{martyr:F0}%");
+                        table.Cell().Element(CellStyleDefault).Text($"{camouflage:F1}");
+                        table.Cell().Element(CellStyleDefault).Text(profile).FontSize(8);
+                    }
+                });
+
+                // Azalpenak
+                col.Item().PaddingTop(15).Column(c =>
+                {
+                    c.Item().Text("ℹ️ Metrika Azalpenak:").SemiBold().FontSize(11);
+                    c.Item().PaddingLeft(10).Text("• 🕵️ Detektibe Sen: Herritarra denean, zenbat zuzen bozkatu dion inpostoreari (%)").FontSize(9).FontColor(QuestPDF.Helpers.Colors.Grey.Darken2);
+                    c.Item().PaddingLeft(10).Text("• 💀 Martiria: Herritarra denean, zenbat aldiz kanporatu duten oker (%)").FontSize(9).FontColor(QuestPDF.Helpers.Colors.Grey.Darken2);
+                    c.Item().PaddingLeft(10).Text("• 🥷 Kamuflajea: Inpostorea denean, batez beste zenbat bozketa iraun ditu").FontSize(9).FontColor(QuestPDF.Helpers.Colors.Grey.Darken2);
+                });
+            });
+        }
+
+        void ComposeConclusions(IContainer container)
+        {
+            container.Column(col =>
+            {
+                col.Item().Text("🎯 KONKLUSIOAK ETA GOMENDIOAK").SemiBold().FontSize(16).FontColor(QuestPDF.Helpers.Colors.Green.Darken2);
+                
+                col.Item().PaddingTop(10).Column(c =>
+                {
+                    // 1. Orekaren analisia
+                    double impRate = _data.Stats.ImpostorWinRate;
+                    string balanceAnalysis = impRate > 55 
+                        ? "⚠️ Inpostoreek abantaila handia daukate. Gomendio: Herritarrei bozketa denbora gehiago eman."
+                        : impRate < 45 
+                        ? "⚠️ Herritarrek abantaila handia daukate. Gomendio: Inpostore rol-a errazteko aldaketak egin."
+                        : "✅ Jokoa ondo orekaturik dago. Jarraitu horrela!";
+
+                    c.Item().Text(balanceAnalysis).FontSize(10).FontColor(QuestPDF.Helpers.Colors.Blue.Darken1);
+
+                    // 2. Top jokalaria
+                    if (_data.List.Any())
+                    {
+                        var topPlayer = _data.List.First();
+                        c.Item().PaddingTop(10).Text($"🏆 Jokalari onena: {topPlayer.Username} ({topPlayer.TotalWins} gareipen, {topPlayer.WinRate} win rate)")
+                           .FontSize(10).SemiBold();
+                    }
+
+                    // 3. Gomendio orokorrak
+                    c.Item().PaddingTop(15).Text("💡 Gomendio Orokorrak:").SemiBold().FontSize(11);
+                    c.Item().PaddingLeft(10).Text("• Jokalari berrientzat: Hasi herritar gisa, hitza aztertu eta beste jokalari susmagarriak aurkitu.").FontSize(9);
+                    c.Item().PaddingLeft(10).Text("• Inpostore espertu bat izan nahi baduzu: Kamuflajea garatu, eta ez izan 'oso' aktiboa.").FontSize(9);
+                    c.Item().PaddingLeft(10).Text("• Detektibe gisa hobetzeko: Bozkatu zuzen, besteek zer dioten entzun, eta ez grazy izan.").FontSize(9);
+                });
+
+                col.Item().PaddingTop(20).AlignCenter().Text("Mila esker jokatzeagatik! 🎭")
+                   .SemiBold().FontSize(14).FontColor(QuestPDF.Helpers.Colors.Blue.Medium);
+            });
+        }
+
+        // ========== ESTILO LAGUNTZAILEAK ==========
+
+        static IContainer HeaderStyle(IContainer container)
+        {
+            return container.Border(1).BorderColor(QuestPDF.Helpers.Colors.Blue.Medium)
+                .Background(QuestPDF.Helpers.Colors.Blue.Lighten3)
+                .Padding(5).AlignCenter().AlignMiddle();
+        }
+
+        static IContainer CellStyle(IContainer container, string bgColor)
+        {
+            return container.Border(1).BorderColor(QuestPDF.Helpers.Colors.Grey.Lighten2)
+                .Background(bgColor).Padding(5).AlignCenter().AlignMiddle();
+        }
+
+        static IContainer CellStyleDefault(IContainer container)
+        {
+            return CellStyle(container, QuestPDF.Helpers.Colors.White);
+        }
+
+        // ========== LAGUNTZAILE METODOAK ==========
+
+        string GetPlayerProfile(double detective, double martyr, double camouflage)
+        {
+            if (detective > 70 && martyr < 20) return "🎖️ Dedektibe Maistra";
+            if (detective > 60) return "🔍 Analista Ona";
+            if (martyr > 50) return "😵 Susmagarria";
+            if (camouflage > 2.5) return "🥷 Inpostore Maisu";
+            if (camouflage > 1.5) return "😎 Kamuflaje Ona";
+            return "🆕 Hasiberria";
         }
     }
 }

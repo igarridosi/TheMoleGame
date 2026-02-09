@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Client"
         mc:Ignorable="d"
-        Title="Ranking Orokorra" Height="500" Width="600"
+        Title="Ranking Orokorra" Height="700" Width="850"
         WindowStartupLocation="CenterScreen" Background="#1E1E1E">
     <Grid Margin="20">
         <Grid.RowDefinitions>
@@ -14,7 +14,11 @@
             <RowDefinition Height="Auto"/>
             <!-- Txartelak (Dashboard) -->
             <RowDefinition Height="*"/>
-            <!-- Zerrenda -->
+            <!-- Ranking Zerrenda -->
+            <RowDefinition Height="Auto"/>
+            <!-- Metrika Titulua -->
+            <RowDefinition Height="*"/>
+            <!-- Metrika Zerrenda -->
             <RowDefinition Height="Auto"/>
             <!-- Botoia -->
         </Grid.RowDefinitions>
@@ -71,7 +75,7 @@
             </Border>
         </Grid>
 
-        <!-- ZERRENDA (DataGrid) -->
+        <!-- RANKING ZERRENDA (DataGrid) -->
         <DataGrid x:Name="gridRanking" Grid.Row="2" 
                   AutoGenerateColumns="False" IsReadOnly="True"
                   Background="#252526" RowBackground="#2D2D2D" AlternatingRowBackground="#333333" HorizontalGridLinesBrush="#444444" Foreground="#00ADB5"
@@ -85,8 +89,60 @@
             </DataGrid.Columns>
         </DataGrid>
 
+        <!-- METRIKA AURRERATUEN TITULUA -->
+        <StackPanel Grid.Row="3" Margin="0,15,0,10">
+            <TextBlock Text="📊 METRIKA AURRERATUAK (Skill-ak)" Foreground="#9B59B6" FontSize="18" FontWeight="Bold"/>
+            <TextBlock Text="Jokalari bakoitzaren gaitasun zehatzak" Foreground="#666" FontSize="11"/>
+        </StackPanel>
+
+        <!-- METRIKA AURRERATUEN ZERRENDA -->
+        <DataGrid x:Name="gridMetrics" Grid.Row="4" 
+                  AutoGenerateColumns="False" IsReadOnly="True"
+                  Background="#252526" RowBackground="#2D2D2D" AlternatingRowBackground="#333333" HorizontalGridLinesBrush="#444444" Foreground="#9B59B6"
+                  BorderThickness="0" HeadersVisibility="Column">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Jokalaria" Binding="{Binding Username}" Width="*">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="White"/>
+                            <Setter Property="FontWeight" Value="SemiBold"/>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+                <DataGridTextColumn Header="🕵️ Detektibe" Binding="{Binding DetectiveScore}" Width="90">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="#3498DB"/>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+                <DataGridTextColumn Header="💀 Martiria" Binding="{Binding MartyrScore}" Width="90">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="#E74C3C"/>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+                <DataGridTextColumn Header="🥷 Kamuflajea" Binding="{Binding CamouflageScore}" Width="100">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="#2ECC71"/>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+                <DataGridTextColumn Header="Profila" Binding="{Binding Profile}" Width="130">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="#F39C12"/>
+                            <Setter Property="FontWeight" Value="Bold"/>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+            </DataGrid.Columns>
+        </DataGrid>
+
         <!-- PDF BOTOIA -->
-        <Button x:Name="btnExportPdf" Grid.Row="3" 
+        <Button x:Name="btnExportPdf" Grid.Row="5" 
                 Content="📄 ESPORTATU PDF (TXOSTENA)" 
                 Height="45" Margin="0,20,0,0"
                 Background="#FF5555" Foreground="White" FontWeight="Bold"

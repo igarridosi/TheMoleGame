@@ -38,12 +38,23 @@ namespace Server
         private HashSet<int> _playersWhoVoted = new HashSet<int>();
         private List<int> _eliminatedPlayers = new List<int>();
 
+        // ALDAGAI BERRIA: Bozketa "erreal" kopurua (ez berdinketa errepikatuak)
+        private int _votingRoundsCompleted = 0;
+
         // TIMERRAK
         private CancellationTokenSource _timerCts;
         private readonly object _turnLock = new object();
 
         // DATU-BASEA (Estatistiketarako)
         private DatabaseManager _dbManager = new DatabaseManager();
+
+        // ESTATISTIKA TENPORALAK (Memorian)
+        // ID -> Zenbat boto eman dituen
+        private Dictionary<int, int> _tempTotalVotes = new Dictionary<int, int>();
+        // ID -> Zenbat asmatu dituen
+        private Dictionary<int, int> _tempCorrectVotes = new Dictionary<int, int>();
+        // ID -> Kanporatua izan den herritar gisa
+        private HashSet<int> _tempMartyrs = new HashSet<int>();
 
         public GameRoom(string code, int hostId, StreamWriter hostWriter, string hostName)
         {
@@ -296,6 +307,7 @@ namespace Server
             _votes.Clear();
             _playersWhoVoted.Clear();
             _eliminatedPlayers.Clear();
+            _votingRoundsCompleted = 0; // BERRIA: Garbitu hasieran
 
             // Jokalari aktiboak (Moderatzaileak kenduta)
             var playingClients = _clients.Keys.Where(id =>
@@ -473,6 +485,18 @@ namespace Server
             _votes.AddOrUpdate(votedName, 1, (k, v) => v + 1);
             _playersVotedCount++;
 
+            // --- ESTATISTIKAK PILATU ---
+            if (!_tempTotalVotes.ContainsKey(clientId)) _tempTotalVotes[clientId] = 0;
+            _tempTotalVotes[clientId]++;
+
+            // Asmatu duen? (Bozkatu duena == Inpostorearen izena)
+            string impostorName = _clientNames.ContainsKey(_impostorId) ? _clientNames[_impostorId] : "";
+            if (votedName == impostorName)
+            {
+                if (!_tempCorrectVotes.ContainsKey(clientId)) _tempCorrectVotes[clientId] = 0;
+                _tempCorrectVotes[clientId]++;
+            }
+
             int totalMods = _clientRoles.Values.Count(r => r == "Moderator");
             int activePlayers = _clients.Count - _eliminatedPlayers.Count - totalMods;
 
@@ -486,6 +510,10 @@ namespace Server
         private void ProcessVotingResults()
         {
             _isVotingPhase = false;
+            Console.WriteLine("[GAME] Botoak zenbatzen...");
+
+            // KONTADOREA IGO: Bozketa bat egin da (berdinketa edo ez)
+            _votingRoundsCompleted++;
 
             string mostVoted = null;
             int maxVotes = 0;
@@ -506,7 +534,14 @@ namespace Server
                 int kickedId = _clientNames.FirstOrDefault(x => x.Value == mostVoted).Key;
                 _eliminatedPlayers.Add(kickedId);
 
-                if (mostVoted == impostorName)
+                // --- MARTIRIA DA? ---
+                if (kickedId != _impostorId)
+                {
+                    // Herritarra zen eta bota egin dute -> Martiria
+                    _tempMartyrs.Add(kickedId);
+                }
+
+                if (kickedId == _impostorId)
                 {
                     EndGame("HERRITARREK IRABAZI DUTE!");
                     return;
@@ -575,16 +610,31 @@ namespace Server
             if (!winner.Contains("BERTAN BEHERA"))
             {
                 bool impostorWon = winner.Contains("INPOSTOREAK");
-                foreach (var cid in _clientNames.Keys)
+
+                // --- INPOSTOREAREN BIZIRAUPENA KALKULATU ---
+                // Irabazi badu: Bozketa guztiak (_votingRoundsCompleted).
+                // Galdu badu (harrapatu dute): Bozketa guztiak -1 (_votingRoundsCompleted - 1).
+                int impSurvivalRounds = impostorWon ? _votingRoundsCompleted : Math.Max(0, _votingRoundsCompleted - 1);
+
+                Console.WriteLine("[STATS] Estatistikak gordetzen...");
+
+                foreach (var clientId in _clientNames.Keys)
                 {
-                    string username = _clientNames[cid];
-                    string role = _clientRoles.ContainsKey(cid) ? _clientRoles[cid] : "Player";
-                    if (role == "Moderator") continue;
+                    string username = _clientNames[clientId];
+                    if (_clientRoles.ContainsKey(clientId) && _clientRoles[clientId] == "Moderator") continue;
 
                     int dbId = _dbManager.GetUserIdByName(username);
-                    bool isImp = (cid == _impostorId);
+                    bool isImp = (clientId == _impostorId);
                     bool isWin = (isImp && impostorWon) || (!isImp && !impostorWon);
-                    _dbManager.UpdateStats(dbId, isImp, isWin);
+                    int votes = _tempTotalVotes.ContainsKey(clientId) ? _tempTotalVotes[clientId] : 0;
+                    int correct = _tempCorrectVotes.ContainsKey(clientId) ? _tempCorrectVotes[clientId] : 0;
+                    bool isMartyr = _tempMartyrs.Contains(clientId);
+
+                    // Inpostore puntuak bakarrik inpostoreari eman
+                    int survivalPoints = isImp ? impSurvivalRounds : 0;
+
+                    _dbManager.UpdateDetailedStats(username, isImp, isWin, votes, correct, isMartyr, survivalPoints);
+                    Console.WriteLine($"[STATS] {username} -> Votes:{votes}, Correct:{correct}, Martyr:{isMartyr}, ImpRounds:{survivalPoints}");
                 }
             }
         }

@@ -15,5 +15,10 @@ namespace Shared
         public int ImpostorWins { get; set; }
         public int CivilianCount { get; set; }
         public int CivilianWins { get; set; }
+        public int TotalVotesCast { get; set; }
+        public int CorrectVotes { get; set; }
+        public int TimesEjectedAsCivilian { get; set; }
+        public int ImpostorRoundsSurvived { get; set; }
+        public int FirstRoundEjections { get; set; }
     }
 }

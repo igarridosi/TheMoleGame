@@ -53,7 +53,12 @@ namespace Server.Data
                             ImpostorCount INTEGER DEFAULT 0, 
                             ImpostorWins INTEGER DEFAULT 0,  
                             CivilianCount INTEGER DEFAULT 0, 
-                            CivilianWins INTEGER DEFAULT 0,  
+                            CivilianWins INTEGER DEFAULT 0, 
+                            TotalVotesCast INTEGER DEFAULT 0,
+                            CorrectVotes INTEGER DEFAULT 0,
+                            TimesEjectedAsCivilian INTEGER DEFAULT 0,
+                            ImpostorRoundsSurvived INTEGER DEFAULT 0,
+                            FirstRoundEjections INTEGER DEFAULT 0,
                             FOREIGN KEY(UserId) REFERENCES Users(Id)
                         );
                     ";
@@ -338,7 +343,9 @@ namespace Server.Data
             return list;
         }
 
-        public void UpdateStats(int userId, bool isImpostor, bool isWinner)
+        public void UpdateDetailedStats(string username, bool isImpostor, bool isWinner,
+                                      int votesCast, int correctVotes,
+                                      bool wasEjectedAsCivilian, int impostorRounds)
         {
             try
             {
@@ -346,7 +353,11 @@ namespace Server.Data
                 {
                     conn.Open();
 
-                    // 1. Ziurtatu ilara existitzen dela
+                    // 1. ZIURTATU ILARA EXISTITZEN DELA (Oso garrantzitsua)
+                    // Lehenik IDa lortu
+                    int userId = GetUserIdByName(username);
+                    if (userId == 0) return; // Erabiltzailea ez da existitzen
+
                     string initSql = "INSERT OR IGNORE INTO Stats (UserId) VALUES (@u)";
                     using (var cmd = new SQLiteCommand(initSql, conn))
                     {
@@ -354,32 +365,45 @@ namespace Server.Data
                         cmd.ExecuteNonQuery();
                     }
 
-                    // 2. Datuak eguneratu
-                    string updateSql = "UPDATE Stats SET GamesPlayed = GamesPlayed + 1";
+                    // 2. DATU GUZTIAK EGUNERATU
+                    string sql = @"
+                        UPDATE Stats SET 
+                            GamesPlayed = GamesPlayed + 1,
+                            GamesWon = GamesWon + @win,
+                            ImpostorCount = ImpostorCount + @isImp,
+                            ImpostorWins = ImpostorWins + @impWin,
+                            CivilianCount = CivilianCount + @isCiv,
+                            CivilianWins = CivilianWins + @civWin,
+                            
+                            TotalVotesCast = TotalVotesCast + @votes,
+                            CorrectVotes = CorrectVotes + @correct,
+                            TimesEjectedAsCivilian = TimesEjectedAsCivilian + @martyr,
+                            ImpostorRoundsSurvived = ImpostorRoundsSurvived + @survived
+                        WHERE UserId = @u";
 
-                    if (isWinner) updateSql += ", GamesWon = GamesWon + 1";
-
-                    if (isImpostor)
-                    {
-                        updateSql += ", ImpostorCount = ImpostorCount + 1";
-                        if (isWinner) updateSql += ", ImpostorWins = ImpostorWins + 1";
-                    }
-                    else
-                    {
-                        updateSql += ", CivilianCount = CivilianCount + 1";
-                        if (isWinner) updateSql += ", CivilianWins = CivilianWins + 1";
-                    }
-
-                    updateSql += " WHERE UserId = @u";
-
-                    using (var cmd = new SQLiteCommand(updateSql, conn))
+                    using (var cmd = new SQLiteCommand(sql, conn))
                     {
                         cmd.Parameters.AddWithValue("@u", userId);
+                        cmd.Parameters.AddWithValue("@win", isWinner ? 1 : 0);
+                        cmd.Parameters.AddWithValue("@isImp", isImpostor ? 1 : 0);
+                        cmd.Parameters.AddWithValue("@impWin", (isImpostor && isWinner) ? 1 : 0);
+                        cmd.Parameters.AddWithValue("@isCiv", (!isImpostor) ? 1 : 0);
+                        cmd.Parameters.AddWithValue("@civWin", (!isImpostor && isWinner) ? 1 : 0);
+
+                        // Datu berriak
+                        cmd.Parameters.AddWithValue("@votes", votesCast);
+                        cmd.Parameters.AddWithValue("@correct", correctVotes);
+                        cmd.Parameters.AddWithValue("@martyr", wasEjectedAsCivilian ? 1 : 0);
+                        cmd.Parameters.AddWithValue("@survived", impostorRounds);
+
                         cmd.ExecuteNonQuery();
                     }
                 }
             }
-            catch (Exception ex) { Console.WriteLine("[DB ERROR] Stats update: " + ex.Message); }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[DB ERROR] Stats update: {ex.Message}");
+            }
         }
 
         public UserStats GetUserStats(int userId)
@@ -402,7 +426,12 @@ namespace Server.Data
                                 ImpostorCount = reader.GetInt32(3),
                                 ImpostorWins = reader.GetInt32(4),
                                 CivilianCount = reader.GetInt32(5),
-                                CivilianWins = reader.GetInt32(6)
+                                CivilianWins = reader.GetInt32(6),
+                                TotalVotesCast = reader.GetInt32(7),
+                                CorrectVotes = reader.GetInt32(8),
+                                TimesEjectedAsCivilian = reader.GetInt32(9),
+                                ImpostorRoundsSurvived = reader.GetInt32(10),
+                                FirstRoundEjections = reader.GetInt32(11)
                             };
                         }
                     }
@@ -484,6 +513,7 @@ namespace Server.Data
             return list;
         }
 
+        // METODO BERRIA: Estatistika globalak lortu
         public GlobalStats GetGlobalStats()
         {
             var stats = new GlobalStats();
@@ -493,17 +523,24 @@ namespace Server.Data
                 {
                     conn.Open();
 
-                    // 1. Partidak guztira (Gutxi gorabehera jokalari guztien partidak zati jokalari kopurua)
-                    // Edo Stats taulako maximoa har dezakegu erreferentzia gisa
-                    var cmdTotal = new SQLiteCommand("SELECT SUM(GamesPlayed) FROM Stats", conn);
-                    long totalPlays = (long)(cmdTotal.ExecuteScalar() ?? 0);
-                    stats.TotalMatches = (int)(totalPlays / 4); // Batez beste 4 jokalari partida bakoitzean (estimazioa)
+                    // 1. Partida kopurua (GamesPlayed guztien batura / 2 gutxi gorabehera)
+                    // Hobeto: Partida guztiak zenbatu
+                    string sqlTotal = "SELECT SUM(GamesPlayed) FROM Stats";
+                    using (var cmd = new SQLiteCommand(sqlTotal, conn))
+                    {
+                        var result = cmd.ExecuteScalar();
+                        // GamesPlayed batura / jokalari kopurua = partida kopurua (gutxi gorabehera)
+                        stats.TotalMatches = result != DBNull.Value ? Convert.ToInt32(result) : 0;
+                    }
 
-                    // 2. Inpostore Onena
-                    string sqlTop = @"SELECT u.Username, s.ImpostorWins 
-                                      FROM Stats s JOIN Users u ON s.UserId = u.Id 
-                                      ORDER BY s.ImpostorWins DESC LIMIT 1";
-                    using (var cmd = new SQLiteCommand(sqlTop, conn))
+                    // 2. Top Inpostorea (Inpostore garaipen gehien dituena)
+                    string sqlTopImp = @"
+                        SELECT u.Username, s.ImpostorWins 
+                        FROM Stats s 
+                        JOIN Users u ON s.UserId = u.Id 
+                        ORDER BY s.ImpostorWins DESC 
+                        LIMIT 1";
+                    using (var cmd = new SQLiteCommand(sqlTopImp, conn))
                     using (var reader = cmd.ExecuteReader())
                     {
                         if (reader.Read())
@@ -513,32 +550,83 @@ namespace Server.Data
                         }
                         else
                         {
-                            stats.TopImpostor = "Ezezaguna";
+                            stats.TopImpostor = "---";
                             stats.TopImpostorWins = 0;
                         }
                     }
 
-                    // 3. Win Rates (Guztiak batu)
-                    var cmdImpWins = new SQLiteCommand("SELECT SUM(ImpostorWins) FROM Stats", conn);
-                    var cmdCivWins = new SQLiteCommand("SELECT SUM(CivilianWins) FROM Stats", conn);
+                    // 3. Inpostore Win Rate (Inpostoreen garaipen ehunekoa)
+                    string sqlRates = @"
+                        SELECT SUM(ImpostorWins), SUM(ImpostorCount) 
+                        FROM Stats";
+                    using (var cmd = new SQLiteCommand(sqlRates, conn))
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            int impWins = reader.IsDBNull(0) ? 0 : reader.GetInt32(0);
+                            int impGames = reader.IsDBNull(1) ? 0 : reader.GetInt32(1);
+                            stats.ImpostorWinRate = impGames > 0 ? (double)impWins / impGames * 100 : 50;
+                        }
+                    }
 
-                    long totalImpWins = (long)(cmdImpWins.ExecuteScalar() ?? 0);
-                    long totalCivWins = (long)(cmdCivWins.ExecuteScalar() ?? 0);
-                    long totalWins = totalImpWins + totalCivWins;
+                    // 4. Batezbesteko rondak (Aukera)
+                    stats.AvgRounds = 2.5; // Default balioa
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[DB ERROR] GetGlobalStats: {ex.Message}");
+            }
+            return stats;
+        }
 
-                    if (totalWins > 0)
-                        stats.ImpostorWinRate = (double)totalImpWins / totalWins * 100;
-                    else
-                        stats.ImpostorWinRate = 0;
+        // METODO BERRIA: Estatistika zehatzak lortu erabiltzaile guztientzat
+        public List<UserStatsWithName> GetAllDetailedStats()
+        {
+            var list = new List<UserStatsWithName>();
+            try
+            {
+                using (var conn = GetConnection())
+                {
+                    conn.Open();
+                    string sql = @"
+                        SELECT u.Username, s.* 
+                        FROM Stats s 
+                        JOIN Users u ON s.UserId = u.Id 
+                        ORDER BY s.GamesWon DESC";
 
-                    // 4. Batezbesteko Rondak (Hau ez dugu DBan gordetzen partida bakoitzeko, 
-                    // beraz zenbaki finko bat jarriko dugu edo randomizatu simulazio gisa)
-                    stats.AvgRounds = 2.1;
+                    using (var cmd = new SQLiteCommand(sql, conn))
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            list.Add(new UserStatsWithName
+                            {
+                                Username = reader.GetString(0),
+                                Stats = new UserStats
+                                {
+                                    GamesPlayed = reader.GetInt32(2),
+                                    GamesWon = reader.GetInt32(3),
+                                    ImpostorCount = reader.GetInt32(4),
+                                    ImpostorWins = reader.GetInt32(5),
+                                    CivilianCount = reader.GetInt32(6),
+                                    CivilianWins = reader.GetInt32(7),
+                                    TotalVotesCast = reader.GetInt32(8),
+                                    CorrectVotes = reader.GetInt32(9),
+                                    TimesEjectedAsCivilian = reader.GetInt32(10),
+                                    ImpostorRoundsSurvived = reader.GetInt32(11),
+                                    FirstRoundEjections = reader.GetInt32(12)
+                                }
+                            });
+                        }
+                    }
                 }
             }
             catch { }
-            return stats;
+            return list;
         }
+
         public bool CreateUserWithRole(string username, string password, string role)
         {
             try
