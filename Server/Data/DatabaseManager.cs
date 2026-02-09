@@ -523,14 +523,14 @@ namespace Server.Data
                 {
                     conn.Open();
 
-                    // 1. Partida kopurua (GamesPlayed guztien batura / 2 gutxi gorabehera)
-                    // Hobeto: Partida guztiak zenbatu
-                    string sqlTotal = "SELECT SUM(GamesPlayed) FROM Stats";
+                    // 1. Partida kopurua kalkulatzeko, batez besteko jokalari kopurua erabili
+                    // Jokalari batek 3 partida jokatu badu, GamesPlayed = 3
+                    // Beraz, gehienez jokatu duen jokalariaren partidak eman ditzakegu
+                    string sqlTotal = "SELECT MAX(GamesPlayed) FROM Stats";
                     using (var cmd = new SQLiteCommand(sqlTotal, conn))
                     {
                         var result = cmd.ExecuteScalar();
-                        // GamesPlayed batura / jokalari kopurua = partida kopurua (gutxi gorabehera)
-                        stats.TotalMatches = result != DBNull.Value ? Convert.ToInt32(result) : 0;
+                        stats.TotalMatches = result != DBNull.Value && result != null ? Convert.ToInt32(result) : 0;
                     }
 
                     // 2. Top Inpostorea (Inpostore garaipen gehien dituena)
@@ -590,20 +590,37 @@ namespace Server.Data
                 using (var conn = GetConnection())
                 {
                     conn.Open();
+                    // LEFT JOIN erabili jokalari guztiak lortzeko (partidarik ez dutenak barne)
+                    // COALESCE erabiliko dugu NULL balioak 0-rekin ordezkatzeko
                     string sql = @"
-                        SELECT u.Username, s.* 
-                        FROM Stats s 
-                        JOIN Users u ON s.UserId = u.Id 
-                        ORDER BY s.GamesWon DESC";
+                        SELECT 
+                            u.Username, 
+                            u.Id,
+                            COALESCE(s.GamesPlayed, 0) AS GamesPlayed,
+                            COALESCE(s.GamesWon, 0) AS GamesWon,
+                            COALESCE(s.ImpostorCount, 0) AS ImpostorCount,
+                            COALESCE(s.ImpostorWins, 0) AS ImpostorWins,
+                            COALESCE(s.CivilianCount, 0) AS CivilianCount,
+                            COALESCE(s.CivilianWins, 0) AS CivilianWins,
+                            COALESCE(s.TotalVotesCast, 0) AS TotalVotesCast,
+                            COALESCE(s.CorrectVotes, 0) AS CorrectVotes,
+                            COALESCE(s.TimesEjectedAsCivilian, 0) AS TimesEjectedAsCivilian,
+                            COALESCE(s.ImpostorRoundsSurvived, 0) AS ImpostorRoundsSurvived,
+                            COALESCE(s.FirstRoundEjections, 0) AS FirstRoundEjections
+                        FROM Users u
+                        LEFT JOIN Stats s ON u.Id = s.UserId
+                        WHERE u.Role = 'Player'
+                        ORDER BY GamesWon DESC";
 
                     using (var cmd = new SQLiteCommand(sql, conn))
                     using (var reader = cmd.ExecuteReader())
                     {
                         while (reader.Read())
                         {
-                            list.Add(new UserStatsWithName
+                            var username = reader.GetString(0);
+                            var userStats = new UserStatsWithName
                             {
-                                Username = reader.GetString(0),
+                                Username = username,
                                 Stats = new UserStats
                                 {
                                     GamesPlayed = reader.GetInt32(2),
@@ -618,12 +635,18 @@ namespace Server.Data
                                     ImpostorRoundsSurvived = reader.GetInt32(11),
                                     FirstRoundEjections = reader.GetInt32(12)
                                 }
-                            });
+                            };
+                            list.Add(userStats);
+                            Console.WriteLine($"[DB] DetailedStats lortu: {username} (Partidak: {userStats.Stats.GamesPlayed})");
                         }
                     }
                 }
+                Console.WriteLine($"[DB] DetailedStats GUZTIRA: {list.Count} jokalari");
             }
-            catch { }
+            catch (Exception ex) 
+            { 
+                Console.WriteLine($"[DB ERROR] GetAllDetailedStats: {ex.Message}");
+            }
             return list;
         }
 

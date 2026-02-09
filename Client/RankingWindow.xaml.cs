@@ -19,7 +19,6 @@ namespace Client
         public string DetectiveScore { get; set; }  // Detektibe Sen (%)
         public string MartyrScore { get; set; }     // Martiria (%)
         public string CamouflageScore { get; set; } // Kamuflajea (Rondak)
-        public string Profile { get; set; }         // Jokalari profila
     }
 
     public partial class RankingWindow : Window
@@ -66,8 +65,11 @@ namespace Client
         // METODO BERRIA: Metrika aurreratuak taula batean erakutsi
         private void LoadMetricsGrid()
         {
+            Console.WriteLine($"[CLIENT] LoadMetricsGrid deiturik. _detailedStats = {(_detailedStats == null ? "NULL" : _detailedStats.Count + " jokalari")}");
+            
             if (_detailedStats == null || !_detailedStats.Any())
             {
+                Console.WriteLine("[CLIENT] OHARRA: _detailedStats hutsa dago, metrikak ez dira erakutsiko.");
                 gridMetrics.ItemsSource = null;
                 return;
             }
@@ -93,8 +95,7 @@ namespace Client
                     ? (double)stats.ImpostorRoundsSurvived / stats.ImpostorCount
                     : 0;
 
-                // 4. Profila erabaki
-                string profile = GetPlayerProfile(detective, martyr, camouflage);
+                Console.WriteLine($"[CLIENT] Metrika: {item.Username} - Det:{detective:F0}% Martyr:{martyr:F0}% Kamuf:{camouflage:F1}");
 
                 metricsList.Add(new PlayerMetricDisplay
                 {
@@ -102,10 +103,10 @@ namespace Client
                     DetectiveScore = $"{detective:F0}%",
                     MartyrScore = $"{martyr:F0}%",
                     CamouflageScore = $"{camouflage:F1} ronda",
-                    Profile = profile
                 });
             }
 
+            Console.WriteLine($"[CLIENT] Metrika zerrenda sortu da: {metricsList.Count} erregistro. ItemsSource ezartzen...");
             gridMetrics.ItemsSource = metricsList;
         }
 
@@ -305,10 +306,9 @@ namespace Client
                     table.ColumnsDefinition(columns =>
                     {
                         columns.RelativeColumn(2);    // Jokalaria
-                        columns.ConstantColumn(60);   // Detektibe Sen
-                        columns.ConstantColumn(60);   // Martiria
-                        columns.ConstantColumn(70);   // Kamuflajea
-                        columns.ConstantColumn(80);   // Interpretazioa
+                        columns.ConstantColumn(90);   // Detektibe Sen
+                        columns.ConstantColumn(90);   // Martiria
+                        columns.ConstantColumn(90);   // Kamuflajea
                     });
 
                     // Goiburuak
@@ -318,7 +318,6 @@ namespace Client
                         header.Cell().Element(HeaderStyle).Text("🕵️ Detekt.");
                         header.Cell().Element(HeaderStyle).Text("💀 Martir.");
                         header.Cell().Element(HeaderStyle).Text("🥷 Kamuf.");
-                        header.Cell().Element(HeaderStyle).Text("Profila");
                     });
 
                     // Datuak - ALDATUTA: UserStatsWithName erabili
@@ -342,13 +341,10 @@ namespace Client
                             : 0;
 
                         // 4. Profila erabaki
-                        string profile = GetPlayerProfile(detective, martyr, camouflage);
-
                         table.Cell().Element(CellStyleDefault).Text(item.Username);
                         table.Cell().Element(CellStyleDefault).Text($"{detective:F0}%");
                         table.Cell().Element(CellStyleDefault).Text($"{martyr:F0}%");
                         table.Cell().Element(CellStyleDefault).Text($"{camouflage:F1}");
-                        table.Cell().Element(CellStyleDefault).Text(profile).FontSize(8);
                     }
                 });
 
@@ -388,12 +384,6 @@ namespace Client
                         c.Item().PaddingTop(10).Text($"🏆 Jokalari onena: {topPlayer.Username} ({topPlayer.TotalWins} gareipen, {topPlayer.WinRate} win rate)")
                            .FontSize(10).SemiBold();
                     }
-
-                    // 3. Gomendio orokorrak
-                    c.Item().PaddingTop(15).Text("💡 Gomendio Orokorrak:").SemiBold().FontSize(11);
-                    c.Item().PaddingLeft(10).Text("• Jokalari berrientzat: Hasi herritar gisa, hitza aztertu eta beste jokalari susmagarriak aurkitu.").FontSize(9);
-                    c.Item().PaddingLeft(10).Text("• Inpostore espertu bat izan nahi baduzu: Kamuflajea garatu, eta ez izan 'oso' aktiboa.").FontSize(9);
-                    c.Item().PaddingLeft(10).Text("• Detektibe gisa hobetzeko: Bozkatu zuzen, besteek zer dioten entzun, eta ez grazy izan.").FontSize(9);
                 });
 
                 col.Item().PaddingTop(20).AlignCenter().Text("Mila esker jokatzeagatik! 🎭")
@@ -419,18 +409,6 @@ namespace Client
         static IContainer CellStyleDefault(IContainer container)
         {
             return CellStyle(container, QuestPDF.Helpers.Colors.White);
-        }
-
-        // ========== LAGUNTZAILE METODOAK ==========
-
-        string GetPlayerProfile(double detective, double martyr, double camouflage)
-        {
-            if (detective > 70 && martyr < 20) return "🎖️ Dedektibe Maistra";
-            if (detective > 60) return "🔍 Analista Ona";
-            if (martyr > 50) return "😵 Susmagarria";
-            if (camouflage > 2.5) return "🥷 Inpostore Maisu";
-            if (camouflage > 1.5) return "😎 Kamuflaje Ona";
-            return "🆕 Hasiberria";
         }
     }
 }

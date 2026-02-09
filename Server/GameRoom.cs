@@ -207,6 +207,7 @@ namespace Server
                         // DBtik ranking orokorra lortu
                         var list = _dbManager.GetGlobalRanking();
                         var gStats = _dbManager.GetGlobalStats();
+                        var detailedStats = _dbManager.GetAllDetailedStats(); // BERRIA: Estatistika zehatzak gehitu
 
                         // Bidali
                         if (_clients.TryGetValue(clientId, out StreamWriter myWriter))
@@ -214,7 +215,12 @@ namespace Server
                             myWriter.WriteLine(PacketSerializer.Serialize(new Packet
                             {
                                 Type = PacketType.GetRankingResponse,
-                                Message = PacketSerializer.SerializeData(new RankingPayload { List = list, Stats = gStats })
+                                Message = PacketSerializer.SerializeData(new RankingPayload 
+                                { 
+                                    List = list, 
+                                    Stats = gStats,
+                                    DetailedStats = detailedStats // BERRIA: Gehitu
+                                })
                             }));
                         }
                     }

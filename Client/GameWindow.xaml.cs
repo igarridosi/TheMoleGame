@@ -535,6 +535,7 @@ namespace Client
 
             // Kontrolak berriz aktibatu
             txtMessage.IsEnabled = false; // Hasi arte blokeatuta
+            txtMessage.Text = "";
             btnSend.IsEnabled = false;
             lstPlayers.IsEnabled = true;  // Zerrenda berriz aktibatu
 
