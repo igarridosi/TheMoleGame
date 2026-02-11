@@ -101,16 +101,16 @@
                         </Style>
                     </DataGridTextColumn.ElementStyle>
                 </DataGridTextColumn>
-                <DataGridTextColumn Header="Partidak" Binding="{Binding GamesPlayed}" Width="80"/>
-                <DataGridTextColumn Header="Garaipenak" Binding="{Binding TotalWins}" Width="80"/>
-                <DataGridTextColumn Header="Inp. Garaipenak" Binding="{Binding ImpostorWins}" Width="100"/>
-                <DataGridTextColumn Header="Win Rate" Binding="{Binding WinRate}" Width="80"/>
+                <DataGridTextColumn Header="Partidak" Binding="{Binding GamesPlayed}" Width="150"/>
+                <DataGridTextColumn Header="Garaipenak" Binding="{Binding TotalWins}" Width="150"/>
+                <DataGridTextColumn Header="Inp. Garaipenak" Binding="{Binding ImpostorWins}" Width="150"/>
+                <DataGridTextColumn Header="Win Rate" Binding="{Binding WinRate}" Width="150"/>
             </DataGrid.Columns>
         </DataGrid>
 
         <!-- METRIKA AURRERATUEN TITULUA -->
         <StackPanel Grid.Row="3" Margin="0,15,0,10">
-            <TextBlock Text="📊 METRIKA AURRERATUAK (Skill-ak)" Foreground="#9B59B6" FontSize="18" FontWeight="Bold"/>
+            <TextBlock Text="📶 METRIKA AURRERATUAK (Skill-ak)" Foreground="#00ADB5" FontSize="18" FontWeight="Bold"/>
             <TextBlock Text="Jokalari bakoitzaren gaitasun zehatzak" Foreground="#666" FontSize="11"/>
         </StackPanel>
 
