@@ -1,6 +1,8 @@
 # 🕵️‍♂️ The Mole Game
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![.NET 8](https://img.shields.io/badge/.NET-8.0-purple)](https://dotnet.microsoft.com/) [![Status](https://img.shields.io/badge/Status-Completed-success)]()
+[![.NET Core Desktop](https://github.com/igarridosi/TheMoleGame/actions/workflows/dotnet.yml/badge.svg)](https://github.com/igarridosi/TheMoleGame/actions/workflows/dotnet.yml)
+[![.NET 8](https://img.shields.io/badge/.NET-8.0-purple)](https://dotnet.microsoft.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 > **Hizkuntza aukeratu / Choose language:**
 > 
@@ -16,41 +18,36 @@ Jokalari talde batek hitz sekretu bat partekatzen du, baina horietako bat **"Inp
 
 ### 🚀 Ezaugarri Nagusiak
 
-*   **Bezero-Zerbitzari Arkitektura:** TCP Socket-ak erabiliz komunikazioa.
-*   **Denbora Erreala:** Chat-a, jokoaren egoera eta bozketak berehala sinkronizatzen dira.
-*   **Rolak:** Herritarra, Inpostorea (kategoriarekin) eta **Moderatzailea** (God Mode panelarekin).
+#### 🎮 Jokoaren Mekanika
+*   **Multi-Room Sistema:** Hainbat partida paraleloan jokatu daitezke zerbitzari berean. Jokalariek gelak sor ditzakete edo kode bidez sartu.
+*   **Rolak:** Herritarra, Inpostorea (kategoriarekin) eta **Moderatzailea** (God Mode).
+*   **Tenporizadoreak:** 20 segunduko muga txandetan hitza idazteko eta 60 segundu bozketarako. Denbora agortzean sistema automatikoak jokatzen du.
 *   **Dinamismoa:** Erronda kopurua jokalari kopuruaren arabera egokitzen da automatikoki.
-*   **Segurtasuna:** BAN sistema, Kick, eta pasahitz zifratuak (SHA256).
-*   **Estatistikak:** Jokalari bakoitzak bere profil pertsonalizatua du (Dashboard).
-*   **Interfaze Modernoa:** WPF Dark Mode diseinua, Pop-up leiho ez-blokeatzaileekin.
 
-### 🛠️ Teknologia
+#### ⚙️ Alderdi Teknikoak
+*   **Bezero-Zerbitzari Arkitektura:** TCP Socket-ak erabiliz komunikazio asinkronoa.
+*   **Konkurrentzia:** Hari anitzeko (Multi-threading) kudeaketa eta *Thread-Safety* (ConcurrentDictionary, Locks, Semaphores).
+*   **Datuen Iraunkortasuna:** SQLite datu-basea erabiltzaileak, hitzak eta estatistikak gordetzeko.
+*   **Reporting:** Estatistika aurreratuak (Win Rate, Detektibe Sen, Martiria...) eta **PDF Esportazioa** (QuestPDF).
+*   **CI/CD:** GitHub Actions bidezko test automatizatuak (Unitarioak eta Integraziozkoak).
 
-*   **Lengoaia:** C# (.NET 8.0)
-*   **UI:** WPF (Windows Presentation Foundation)
-*   **Datu-basea:** SQLite
-*   **Sarea:** `System.Net.Sockets` (TCP)
+### 🛠️ Moderatzaile Modua (God Mode)
+Moderatzaileak panel berezi bat dauka jokoa kudeatzeko jokatzen ez duen bitartean:
+*   **Erabiltzaile Kudeaketa:** Erabiltzaileak sortu, rolak aldatu eta **BAN/UNBAN** sistema.
+*   **Edukien Kudeaketa:** Hitz eta Kategoria berriak gehitu jokotik irten gabe.
+*   **Partiden Kontrola:** Gela aktiboak ikusi, edozein partidatan sartu, `SKIP ROUND`, `ANNOUNCE` mezuak bidali.
 
 ### 📥 Instalazioa eta Erabilera
 
-Ez da beharrezkoa kodea konpilatzea jolasteko.
+Ez da beharrezkoa kodea konpilatzea jolasteko ("Self-Contained" moduan dago).
 
 1.  Joan **Releases** atalera eta deskargatu azken bertsioa.
 2.  Deskonprimitu karpeta.
-3.  **Zerbitzaria:** Exekutatu `Server/TheMoleGame.Server.exe`. (Sareko IPa erakutsiko du).
+3.  **Zerbitzaria:** Exekutatu `Server/TheMoleGame.Server.exe`.
 4.  **Bezeroa:** Exekutatu `Client/TheMoleGame.Client.exe` eta sartu Zerbitzariaren IPa.
 5.  Erregistratu erabiltzaile berri bat eta jolastu!
 
-> **Admin kontua:** `admin` / `admin123`
-> **Moderatzaile kontua:** `moderator` / `masterkey`
-
----
-
-### 📸 Pantaila-argazkiak
-
-| Login Leihoa | Lobby & Chat | Bozketa Fasea |
-| :---: | :---: | :---: |
-| ![Login Screen](https://via.placeholder.com/250x150?text=Login) | ![Lobby](https://via.placeholder.com/250x150?text=Lobby) | ![Voting](https://via.placeholder.com/250x150?text=Voting) |
+> **Moderatzaile kontu lehenetsia:** `moderator` / `masterkey`
 
 ---
 
@@ -66,24 +63,28 @@ A group of players shares a secret word, except for one person: the **"Impostor"
 
 ### 🚀 Key Features
 
-*   **Client-Server Architecture:** Communication via TCP Sockets.
-*   **Real-Time:** Chat, game state, and voting are instantly synchronized.
-*   **Roles:** Civilian, Impostor (with category hint), and **Moderator** (God Mode panel).
-*   **Dynamic Gameplay:** Round count automatically adjusts based on player count.
-*   **Security:** BAN system, Kick feature, and encrypted passwords (SHA256).
-*   **Statistics:** Personalized Dashboard for each player.
-*   **Modern Interface:** WPF Dark Mode design with non-blocking pop-ups.
+#### 🎮 Gameplay
+*   **Multi-Room System:** Support for parallel games on the same server. Players can create rooms or join via code.
+*   **Roles:** Civilian, Impostor (with category hint), and **Moderator** (God Mode).
+*   **Timers:** 20s turn timer and 60s voting timer. Automatic handling of timeouts/AFK players.
+*   **Dynamic Logic:** Round count automatically adjusts based on player count.
 
-### 🛠️ Technology Stack
+#### ⚙️ Technical Highlights
+*   **Client-Server Architecture:** Asynchronous communication via TCP Sockets.
+*   **Concurrency:** Multi-threading and Thread-Safety (ConcurrentDictionary, Locks, Semaphores).
+*   **Persistence:** SQLite database for users, game content, and historical stats.
+*   **Reporting:** Advanced Analytics (Win Rate, Detective Sense, Martyrdom...) and **PDF Export** using QuestPDF.
+*   **CI/CD:** Automated testing pipeline via GitHub Actions.
 
-*   **Language:** C# (.NET 8.0)
-*   **UI:** WPF (Windows Presentation Foundation)
-*   **Database:** SQLite
-*   **Networking:** `System.Net.Sockets` (TCP)
+### 🛠️ Moderator Mode (God Mode)
+Moderators have a dedicated dashboard to manage the game without playing:
+*   **User Management:** Create users, change roles, and a complete **BAN/UNBAN** system.
+*   **Content Management:** Add new Words and Categories on the fly.
+*   **Game Control:** View active rooms, join any game, send `ANNOUNCE` messages or `SKIP ROUND`.
 
 ### 📥 Installation & Usage
 
-No compilation required to play.
+No compilation required ("Self-Contained" deployment).
 
 1.  Go to the **Releases** section and download the latest version.
 2.  Unzip the folder.
@@ -91,14 +92,7 @@ No compilation required to play.
 4.  **Client:** Run `Client/TheMoleGame.Client.exe` and enter the Server IP.
 5.  Register a new user and start playing!
 
-> **Default Admin:** `admin` / `admin123`
-> **Default Moderator:** `moderator` / `masterkey`
-
----
-
-### 📸 Screenshots
-
-*(Screenshots will be added here)*
+> **Default Moderator Credentials:** `moderator` / `masterkey`
 
 ---
 
