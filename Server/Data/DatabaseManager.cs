@@ -29,7 +29,7 @@ namespace Server.Data
                 {
                     connection.Open();
 
-                    // 1. Taulak sortu
+                    // 1. Taulak sortu (Hau berdin geratzen da)
                     string sql = @"
                         CREATE TABLE IF NOT EXISTS Users (
                             Id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,7 +47,7 @@ namespace Server.Data
                         );
 
                         CREATE TABLE IF NOT EXISTS Stats (
-                            UserId INTEGER PRIMARY KEY, -- Erabiltzaile bakoitzak ilara bakarra
+                            UserId INTEGER PRIMARY KEY, 
                             GamesPlayed INTEGER DEFAULT 0,
                             GamesWon INTEGER DEFAULT 0,
                             ImpostorCount INTEGER DEFAULT 0, 
@@ -68,12 +68,9 @@ namespace Server.Data
                         command.ExecuteNonQuery();
                     }
 
-                    // 2. ADMIN SORTU
-                    // Hemen deitzen dugu SecurityHelper.HashPassword
-                    string hasheatutakoPasahitza = SecurityHelper.HashPassword("admin123");
+                    // 2. ERABILTZAILE LEHENETSIAK: BAKARRIK MODERATZAILEA
 
-                    // MODERATZAILEA SORTU
-                    // Ziurtatu lehenik ez dela existitzen
+                    // MODERATZAILEA SORTU (Ziurtatu lehenik ez dela existitzen)
                     string checkMod = "SELECT COUNT(*) FROM Users WHERE Username = 'moderator'";
                     using (var cmd = new SQLiteCommand(checkMod, connection))
                     {
@@ -81,7 +78,7 @@ namespace Server.Data
                         if (count == 0)
                         {
                             string superPass = SecurityHelper.HashPassword("masterkey");
-                            // Role zutabea 'Moderator' da
+                            // Role = 'Moderator'
                             string insertSuper = $"INSERT INTO Users (Username, PasswordHash, Role) VALUES ('moderator', '{superPass}', 'Moderator')";
                             using (var cmdInsert = new SQLiteCommand(insertSuper, connection))
                             {
@@ -91,15 +88,7 @@ namespace Server.Data
                         }
                     }
 
-                    // KONTUZ HEMEN: 'hasheatutakoPasahitza' aldagaia sartu behar da, EZ 'admin123'
-                    string insertAdmin = $"INSERT INTO Users (Username, PasswordHash, Role) VALUES ('admin', '{hasheatutakoPasahitza}', 'Admin')";
-
-                    using (var command = new SQLiteCommand(insertAdmin, connection))
-                    {
-                        command.ExecuteNonQuery();
-                    }
-
-                    // 3. Hitzak sartu
+                    // 3. Hitzak sartu (Berdin)
                     string insertWords = @"INSERT INTO Words (Category, WordText) VALUES 
                         ('Animaliak', 'Katua'), ('Animaliak', 'Txakurra'), ('Animaliak', 'Elefantea'),
                         ('Janaria', 'Pizza'), ('Janaria', 'Hanburgesa'), ('Janaria', 'Sushi'),
@@ -109,10 +98,8 @@ namespace Server.Data
                     {
                         command.ExecuteNonQuery();
                     }
-
-                    
                 }
-                Console.WriteLine("Datu-basea ondo sortu da (Hash-arekin)!");
+                Console.WriteLine("Datu-basea ondo sortu da!");
             }
         }
 
@@ -152,7 +139,6 @@ namespace Server.Data
                                 Id = reader.GetInt32(0),
                                 Username = reader.GetString(1),
                                 Role = reader.GetString(2),
-                                IsAdmin = reader.GetString(2) == "Admin"
                             };
                         }
                     }
@@ -317,7 +303,7 @@ namespace Server.Data
             catch { return false; }
         }
 
-        // Erabiltzaile guztien zerrenda lortzeko (Admin Panelerako)
+        // Erabiltzaile guztien zerrenda lortzeko (Moderatzaile Panelerako)
         public List<User> GetAllUsers()
         {
             var list = new List<User>();
@@ -711,8 +697,8 @@ namespace Server.Data
                 {
                     conn.Open();
 
-                    // Segurtasun egiaztapena: Ez ezabatu 'moderator' edo 'admin'
-                    if (username.ToLower() == "moderator" || username.ToLower() == "admin")
+                    // Segurtasun egiaztapena: Ez ezabatu 'moderator'
+                    if (username.ToLower() == "moderator")
                     {
                         Console.WriteLine($"[DB] ERROREA: Ezin da ezabatu erabiltzaile sistema: {username}");
                         return false;
